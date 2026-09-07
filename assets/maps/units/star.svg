@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- star unit icon; recolor by overriding the CSS variables
+     for fill and stroke on the svg root. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" width="15" height="15">
+<defs><style>
+/* Default colors. Override .fill / .stroke from outside to recolor by empire. */
+.fill   { fill: #c8d3df; stroke: #1f2a36; stroke-width: 1; stroke-linejoin: round; }
+.stroke { fill: none;    stroke: #1f2a36; stroke-width: 1; stroke-linejoin: round; stroke-linecap: round; }
+
+</style></defs>
+  <path class="fill" data-layer="drawStar" d="M11.272768 13.097324 C11.090383 13.2304 7.5288305 10.945004 7.303067 10.945447 C7.0772977 10.945895 3.5247824 13.245315 3.3418727 13.112964 C3.1589627 12.980606 4.2316637 8.886725 4.1614704 8.672121 C4.0912843 8.457522 0.8068733 5.789029 0.8762194 5.5741544 C0.94555813 5.3592725 5.170077 5.1145186 5.352469 4.981443 C5.534854 4.84836 7.057486 0.89972013 7.2832556 0.8992712 C7.50902 0.89882976 9.047219 4.841438 9.230129 4.9737883 C9.413039 5.1061535 13.638491 5.3342423 13.708677 5.548848 C13.778872 5.7634535 10.505004 8.444875 10.435665 8.659749 C10.366326 8.874631 11.455161 12.964242 11.272768 13.097324 Z"/>
+</svg>
