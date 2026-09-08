@@ -337,11 +337,16 @@ abstract final class AppTypography {
           letterSpacing: -0.5,
           height: 1.18,
           color: primary),
+      // Material's SliverAppBar.large draws its EXPANDED title from this slot
+      // (appBarTheme.titleTextStyle only styles the collapsed one), so this is
+      // where the HIG large title actually lands. Left at title2 it rendered
+      // at 22 — barely above the 20pt section headers underneath it, which is
+      // exactly the hierarchy a large title exists to establish.
       headlineMedium: TextStyle(
-          fontSize: title2,
+          fontSize: largeTitle,
           fontWeight: bold,
-          letterSpacing: -0.3,
-          height: 1.2,
+          letterSpacing: -0.7,
+          height: 1.15,
           color: primary),
       headlineSmall: TextStyle(
           fontSize: title3,
@@ -453,7 +458,13 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        titleTextStyle: text.titleMedium,
+        // Deliberately NOT set. Material resolves the collapsed AND the
+        // expanded title of SliverAppBar.large from this one slot
+        // (app_bar.dart: titleTextStyle ?? appBarTheme.titleTextStyle ??
+        // config.expandedTextStyle), so pinning it here silently flattens
+        // every large title to the inline size — no hierarchy at all.
+        // Left null, the collapsed title falls back to titleLarge and the
+        // expanded one to headlineMedium, which is the HIG behaviour.
         iconTheme: IconThemeData(color: c.accent, size: 22),
         actionsIconTheme: IconThemeData(color: c.accent, size: 22),
         systemOverlayStyle: isDark
