@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ui_kit.dart';
 import '../lobby/lobby_screen.dart';
 
+/// One question, asked once. Onboarding stays a single step: no carousel, no
+/// permission requests up front, and the primary action is disabled rather
+/// than erroring when the field is empty.
 class NicknameScreen extends StatefulWidget {
   const NicknameScreen({super.key});
 
@@ -14,14 +20,15 @@ class _NicknameScreenState extends State<NicknameScreen> {
   final _authService = AuthService();
   bool _isLoading = false;
 
-  void _saveNickname() async {
+  @override
+  void initState() {
+    super.initState();
+    _nicknameController.addListener(() => setState(() {}));
+  }
+
+  Future<void> _saveNickname() async {
     final nickname = _nicknameController.text.trim();
-    if (nickname.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nickname cannot be empty')),
-      );
-      return;
-    }
+    if (nickname.isEmpty) return;
 
     setState(() => _isLoading = true);
     try {
@@ -34,9 +41,7 @@ class _NicknameScreenState extends State<NicknameScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save nickname: $e')),
-        );
+        showToast(context, 'Could not save that name. $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -51,26 +56,46 @@ class _NicknameScreenState extends State<NicknameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+    final canContinue = _nicknameController.text.trim().isNotEmpty;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Set Nickname')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Please choose a display name to continue.'),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _nicknameController,
-              decoration: const InputDecoration(labelText: 'Nickname'),
-            ),
-            const SizedBox(height: 20),
-            if (_isLoading) const CircularProgressIndicator()
-            else ElevatedButton(
-              onPressed: _saveNickname,
-              child: const Text('Continue'),
-            ),
-          ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: AppSpacing.huge),
+              Text('What should we call you?', style: t.displayMedium),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Other players see this name in the lobby and in negotiations. '
+                'You can change it later in Settings.',
+                style: t.bodyLarge?.copyWith(color: c.labelSecondary),
+              ),
+              const SizedBox(height: AppSpacing.xxxl),
+              TextField(
+                controller: _nicknameController,
+                autofocus: true,
+                textInputAction: TextInputAction.go,
+                onSubmitted: (_) => _saveNickname(),
+                cursorColor: c.accent,
+                maxLength: 24,
+                style: t.headlineSmall,
+                decoration: const InputDecoration(
+                  hintText: 'Talleyrand',
+                  counterText: '',
+                ),
+              ),
+              const Spacer(),
+              AppButton('Continue',
+                  loading: _isLoading,
+                  onPressed: canContinue ? _saveNickname : null),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
+          ),
         ),
       ),
     );

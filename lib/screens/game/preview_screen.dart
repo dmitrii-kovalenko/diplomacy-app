@@ -1,10 +1,17 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../../services/game_service.dart';
-import '../../widgets/map_viewer.dart';
 
+import '../../services/game_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/map_viewer.dart';
+import '../../widgets/ui_kit.dart';
+
+/// Read-only board. Chrome only — the map itself renders exactly as it always
+/// has.
 class GamePreviewScreen extends StatefulWidget {
-  final String gameId;
   const GamePreviewScreen({super.key, required this.gameId});
+
+  final String gameId;
 
   @override
   State<GamePreviewScreen> createState() => _GamePreviewScreenState();
@@ -33,14 +40,12 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
             _isLoading = false;
           });
         }
-      } else {
-        if (mounted) setState(() => _isLoading = false);
+      } else if (mounted) {
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('Failed to load preview: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -48,18 +53,33 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Game Preview (ID: ${widget.gameId})'),
+        title: const Text('Board'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.lg),
+            child: Center(
+              child: StatusPill('#${widget.gameId}'),
+            ),
+          ),
+        ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoader()
           : _svgString == null
-              ? const Center(child: Text('Failed to load map preview.'))
+              ? AppEmptyState(
+                  icon: CupertinoIcons.map,
+                  title: 'Board unavailable',
+                  message: 'The map for this game could not be loaded.',
+                  actionLabel: 'Try again',
+                  onAction: () {
+                    setState(() => _isLoading = true);
+                    _loadPreview();
+                  },
+                )
               : MapViewer(
                   svgString: _svgString!,
                   isReadOnly: true,
-                  onProvinceTapped: (province) {
-                    // Read-only, do nothing
-                  },
+                  onProvinceTapped: (province) {},
                 ),
     );
   }

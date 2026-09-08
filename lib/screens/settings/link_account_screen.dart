@@ -1,9 +1,20 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
-import '../auth/login_screen.dart';
-import 'package:dio/dio.dart';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ui_kit.dart';
+import '../auth/login_screen.dart';
+
+/// Linking a second device.
+///
+/// A sliding segmented control replaces the tab bar — this is one screen with
+/// two modes, not two destinations. The generated code is the hero: display
+/// size, tabular figures, tracked out, with the countdown directly beneath it.
 class LinkAccountScreen extends StatefulWidget {
   const LinkAccountScreen({super.key});
 
@@ -14,14 +25,20 @@ class LinkAccountScreen extends StatefulWidget {
 class _LinkAccountScreenState extends State<LinkAccountScreen> {
   final AuthService _authService = AuthService();
   final TextEditingController _codeController = TextEditingController();
-  
+
+  int _mode = 0; // 0 = show a code, 1 = enter one
   bool _isGenerating = false;
+  bool _isMerging = false;
   String? _generatedCode;
   DateTime? _expiresAt;
   Timer? _timer;
   String _timeLeft = '';
-  
-  bool _isMerging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -30,15 +47,15 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
     super.dispose();
   }
 
-  void _generateCode() async {
+  Future<void> _generateCode() async {
     setState(() {
       _isGenerating = true;
       _generatedCode = null;
     });
-    
     try {
       final res = await _authService.dio.post('/api/auth/link/generate/');
       final data = res.data;
+      if (!mounted) return;
       setState(() {
         _generatedCode = data['code'];
         _expiresAt = DateTime.parse(data['expires_at']).toLocal();
@@ -46,17 +63,13 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
       _startTimer();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to generate code')));
+        showToast(context, 'Could not generate a code.', isError: true);
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isGenerating = false;
-        });
-      }
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
-  
+
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -70,142 +83,207 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
             _generatedCode = null;
           });
         }
-      } else {
-        if (mounted) {
-          setState(() {
-            _timeLeft = '${diff.inMinutes}:${(diff.inSeconds % 60).toString().padLeft(2, '0')}';
-          });
-        }
+      } else if (mounted) {
+        setState(() => _timeLeft =
+            '${diff.inMinutes}:${(diff.inSeconds % 60).toString().padLeft(2, '0')}');
       }
     });
   }
 
-  void _mergeAccount() async {
+  Future<void> _mergeAccount() async {
     final code = _codeController.text.trim().toUpperCase();
-    if (code.isEmpty || code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid 6-character code')));
-      return;
-    }
-    
-    setState(() {
-      _isMerging = true;
-    });
-    
+    if (code.length != 6) return;
+
+    setState(() => _isMerging = true);
     try {
-      final res = await _authService.dio.post('/api/auth/link/merge/', data: {'code': code});
-      final data = res.data;
-      
-      await _authService.saveTokens(data);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Accounts merged successfully')));
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      }
+      final res = await _authService.dio
+          .post('/api/auth/link/merge/', data: {'code': code});
+      await _authService.saveTokens(res.data);
+      if (!mounted) return;
+      showToast(context, 'Accounts linked. Sign in once more to finish.');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? 'Merge failed';
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      }
+      final msg = e.response?.data?['error'] ?? 'Linking failed.';
+      if (mounted) showToast(context, msg.toString(), isError: true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Merge failed: $e')));
-      }
+      if (mounted) showToast(context, 'Linking failed. $e', isError: true);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isMerging = false;
-        });
-      }
+      if (mounted) setState(() => _isMerging = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Link Accounts'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Generate Code'),
-              Tab(text: 'Enter Code'),
+    final c = AppColors.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Linked devices')),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
+        children: [
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: CupertinoSlidingSegmentedControl<int>(
+              groupValue: _mode,
+              backgroundColor: c.fill,
+              thumbColor: c.bgRaised,
+              padding: const EdgeInsets.all(3),
+              onValueChanged: (v) => setState(() => _mode = v ?? 0),
+              children: {
+                0: _segment(context, 'Show a code', _mode == 0),
+                1: _segment(context, 'Enter a code', _mode == 1),
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          AnimatedSwitcher(
+            duration: AppMotion.normal,
+            switchInCurve: AppMotion.standard,
+            child: _mode == 0 ? _generatePane() : _enterPane(),
+          ),
+          const SizedBox(height: AppSpacing.huge),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment(BuildContext context, String label, bool selected) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: selected ? c.labelPrimary : c.labelSecondary,
+            ),
+      ),
+    );
+  }
+
+  Widget _generatePane() {
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+
+    return Column(
+      key: const ValueKey('generate'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Generate a code here, then type it on your other device within the '
+          'countdown.',
+          style: t.bodyMedium?.copyWith(color: c.labelSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+          decoration: BoxDecoration(
+            color: c.bgElevated,
+            borderRadius: AppRadius.brLg,
+            border: Border.all(color: c.separator, width: AppMetrics.hairline),
+          ),
+          child: Column(
+            children: [
+              if (_generatedCode != null) ...[
+                SelectableText(
+                  _generatedCode!,
+                  style: t.displayLarge?.copyWith(
+                    letterSpacing: 8,
+                    color: c.accent,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                StatusPill(
+                  _timeLeft.isEmpty ? 'Valid' : 'Expires in $_timeLeft',
+                  tone: StatusTone.warning,
+                  icon: CupertinoIcons.clock,
+                ),
+              ] else ...[
+                Icon(CupertinoIcons.device_phone_portrait,
+                    size: 34, color: c.labelQuaternary),
+                const SizedBox(height: AppSpacing.md),
+                Text('No active code',
+                    style: t.bodyMedium?.copyWith(color: c.labelSecondary)),
+              ],
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            // Tab 1: Generate Code
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Generate a code here and enter it on your other device to link them together.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  if (_generatedCode != null) ...[
-                    Text(
-                      _generatedCode!,
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        letterSpacing: 8.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Expires in: $_timeLeft', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                  ] else ...[
-                    ElevatedButton(
-                      onPressed: _isGenerating ? null : _generateCode,
-                      child: _isGenerating
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Generate Code'),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            
-            // Tab 2: Enter Code
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Enter the 6-character code generated on your other device.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _codeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Code',
-                      border: OutlineInputBorder(),
-                    ),
-                    textCapitalization: TextCapitalization.characters,
-                    maxLength: 6,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(letterSpacing: 8.0),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isMerging ? null : _mergeAccount,
-                    child: _isMerging
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Merge Account'),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        const SizedBox(height: AppSpacing.xl),
+        AppButton(
+          _generatedCode == null ? 'Generate code' : 'Generate a new code',
+          style: _generatedCode == null
+              ? AppButtonStyle.filled
+              : AppButtonStyle.tinted,
+          loading: _isGenerating,
+          onPressed: _generateCode,
         ),
-      ),
+      ],
+    );
+  }
+
+  Widget _enterPane() {
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+    final ready = _codeController.text.trim().length == 6;
+
+    return Column(
+      key: const ValueKey('enter'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Enter the six-character code shown on your other device.',
+          style: t.bodyMedium?.copyWith(color: c.labelSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Container(
+          decoration: BoxDecoration(
+            color: c.bgElevated,
+            borderRadius: AppRadius.brLg,
+            border: Border.all(color: c.separator, width: AppMetrics.hairline),
+          ),
+          child: TextField(
+            controller: _codeController,
+            textAlign: TextAlign.center,
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 6,
+            autocorrect: false,
+            cursorColor: c.accent,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+              TextInputFormatter.withFunction(
+                  (_, next) => next.copyWith(text: next.text.toUpperCase())),
+            ],
+            style: t.displayMedium?.copyWith(
+              letterSpacing: 10,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              hintText: '••••••',
+              hintStyle: t.displayMedium
+                  ?.copyWith(color: c.labelQuaternary, letterSpacing: 10),
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        AppButton(
+          'Link this device',
+          loading: _isMerging,
+          onPressed: ready ? _mergeAccount : null,
+        ),
+      ],
     );
   }
 }

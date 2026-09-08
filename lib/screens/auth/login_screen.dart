@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ui_kit.dart';
 import 'register_screen.dart';
 import '../lobby/lobby_screen.dart';
 import 'nickname_screen.dart';
 
+/// Sign-in.
+///
+/// The identity leads, the platform buttons come first (they are what most
+/// people will use), and the email form sits below a quiet rule — present,
+/// but not the default path. Nothing here has a border heavier than a
+/// hairline and there is exactly one filled capsule on the screen.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,53 +28,29 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
   bool _isLoading = false;
 
-  void _login() async {
+  Future<void> _run(Future<void> Function() action, String failureLabel) async {
     setState(() => _isLoading = true);
     try {
-      await _authService.login(
-        _emailController.text,
-        _passwordController.text,
-      );
+      await action();
       await _checkNicknameAndProceed();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
-      );
+      showToast(context, '$failureLabel $e', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _loginWithGoogle() async {
-    setState(() => _isLoading = true);
-    try {
-      await _authService.loginWithGoogle();
-      await _checkNicknameAndProceed();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google Login failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  void _login() => _run(
+      () => _authService.login(
+          _emailController.text, _passwordController.text),
+      'Sign-in failed.');
 
-  void _loginWithApple() async {
-    setState(() => _isLoading = true);
-    try {
-      await _authService.loginWithApple();
-      await _checkNicknameAndProceed();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Apple Login failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  void _loginWithGoogle() =>
+      _run(_authService.loginWithGoogle, 'Google sign-in failed.');
+
+  void _loginWithApple() =>
+      _run(_authService.loginWithApple, 'Apple sign-in failed.');
 
   Future<void> _checkNicknameAndProceed() async {
     try {
@@ -81,11 +66,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
-      // Error fetching me, might be token issue.
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching user info: $e')),
-        );
+        showToast(context, 'Could not load your profile. $e', isError: true);
       }
     }
   }
@@ -100,88 +82,94 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: Text(loc.login)),
-      body: Center(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.gutter, vertical: AppSpacing.xxl),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_isLoading) 
-                    const Center(child: CircularProgressIndicator())
+                  const SizedBox(height: AppSpacing.xl),
+                  const _Wordmark(),
+                  const SizedBox(height: AppSpacing.huge),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.huge),
+                      child: AppLoader(label: 'Signing in…'),
+                    )
                   else ...[
                     SignInWithAppleButton(
                       onPressed: _loginWithApple,
                       text: loc.signInWithApple,
-                      style: SignInWithAppleButtonStyle.whiteOutlined,
-                      borderRadius: const BorderRadius.all(Radius.circular(14)),
-                      height: 48,
+                      style: SignInWithAppleButtonStyle.white,
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(AppRadius.capsule)),
+                      height: AppMetrics.buttonHeight,
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 48,
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _loginWithGoogle,
-                        icon: const Icon(Icons.g_mobiledata, size: 32, color: Colors.black),
-                        label: Text(
-                          loc.signInWithGoogle,
-                          style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w500),
+                    const SizedBox(height: AppSpacing.md),
+                    _ProviderButton(
+                      label: loc.signInWithGoogle,
+                      onPressed: _loginWithGoogle,
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    Row(
+                      children: [
+                        Expanded(
+                            child: Divider(
+                                color: c.separator,
+                                thickness: AppMetrics.hairline)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md),
+                          child: Text('or',
+                              style: t.bodySmall
+                                  ?.copyWith(color: c.labelTertiary)),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: Colors.grey.shade300),
-                          ),
+                        Expanded(
+                            child: Divider(
+                                color: c.separator,
+                                thickness: AppMetrics.hairline)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    InsetSection(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _AuthField(
+                          controller: _emailController,
+                          label: loc.email,
+                          hint: 'you@example.com',
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
                         ),
+                        _AuthField(
+                          controller: _passwordController,
+                          label: loc.password,
+                          hint: '••••••••',
+                          obscure: true,
+                          textInputAction: TextInputAction.go,
+                          onSubmitted: (_) => _login(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    AppButton(loc.login, onPressed: _login),
+                    const SizedBox(height: AppSpacing.sm),
+                    AppButton(
+                      loc.createAnAccount,
+                      style: AppButtonStyle.plain,
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RegisterScreen()),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'OR',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(labelText: loc.email),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _passwordController,
-                      decoration: InputDecoration(labelText: loc.password),
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 48,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _login,
-                        child: Text(loc.login, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                        );
-                      },
-                      child: Text(loc.createAnAccount),
                     ),
                   ],
                 ],
@@ -189,6 +177,188 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Wordmark extends StatelessWidget {
+  const _Wordmark();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+    return Column(
+      children: [
+        Container(
+          height: 64,
+          width: 64,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: c.accentMuted,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: c.accent.withOpacity(0.35), width: 1),
+          ),
+          child: Icon(Icons.shield_outlined, size: 32, color: c.accent),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Text('Diplomacy', style: t.displayLarge, textAlign: TextAlign.center),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Seven powers. One map. No dice.',
+          style: t.bodyLarge?.copyWith(color: c.labelSecondary),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+/// Third-party sign-in button, matched to the Apple button's metrics so the
+/// two stack as one block.
+class _ProviderButton extends StatelessWidget {
+  const _ProviderButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onPressed,
+      child: Container(
+        height: AppMetrics.buttonHeight,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: AppRadius.brCapsule,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _GoogleGlyph(),
+            const SizedBox(width: AppSpacing.md),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF1F1F1F),
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Google's four-quadrant mark, drawn rather than shipped as an asset so it
+/// stays crisp at any scale.
+class _GoogleGlyph extends StatelessWidget {
+  const _GoogleGlyph();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 18,
+      width: 18,
+      child: CustomPaint(painter: _GooglePainter()),
+    );
+  }
+}
+
+class _GooglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final centre = Offset(r, r);
+    final stroke = size.width * 0.24;
+    final rect = Rect.fromCircle(center: centre, radius: r - stroke / 2);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    void arc(double startDeg, double sweepDeg, Color color) {
+      paint.color = color;
+      canvas.drawArc(rect, startDeg * 3.1415926 / 180,
+          sweepDeg * 3.1415926 / 180, false, paint);
+    }
+
+    arc(-20, -70, const Color(0xFFEA4335)); // red
+    arc(-90, -100, const Color(0xFF4285F4)); // blue
+    arc(170, 80, const Color(0xFFFBBC05)); // yellow
+    arc(90, 80, const Color(0xFF34A853)); // green
+
+    // The blue crossbar of the "G".
+    final bar = Paint()..color = const Color(0xFF4285F4);
+    canvas.drawRect(
+      Rect.fromLTWH(r, r - stroke / 2, r - stroke * 0.1, stroke),
+      bar,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Field styled as a grouped-list row.
+class _AuthField extends StatelessWidget {
+  const _AuthField({
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.obscure = false,
+    this.keyboardType,
+    this.textInputAction,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+  final bool obscure;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(label,
+                style: t.bodyLarge?.copyWith(color: c.labelSecondary)),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              obscureText: obscure,
+              keyboardType: keyboardType,
+              textInputAction: textInputAction,
+              onSubmitted: onSubmitted,
+              autocorrect: false,
+              enableSuggestions: !obscure,
+              cursorColor: c.accent,
+              style: t.bodyLarge,
+              decoration: InputDecoration(
+                hintText: hint,
+                filled: false,
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

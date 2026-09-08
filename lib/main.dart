@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'services/push_service.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'theme/app_theme.dart';
+import 'widgets/ui_kit.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -21,7 +23,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Handle background message
 }
 
-/// Shows a consent bottom sheet and waits for the user's choice.
+/// Shows a consent sheet and waits for the user's choice.
 /// Returns `true` if analytics consent was granted, `false` otherwise.
 Future<bool> _showConsentSheet(BuildContext context) async {
   bool analyticsEnabled = false;
@@ -29,45 +31,75 @@ Future<bool> _showConsentSheet(BuildContext context) async {
     context: context,
     isDismissible: false,
     enableDrag: false,
+    isScrollControlled: true,
+    backgroundColor: AppColors.of(context).bgElevated,
+    barrierColor: AppColors.of(context).scrim,
     builder: (ctx) {
+      final c = AppColors.of(ctx);
+      final t = Theme.of(ctx).textTheme;
       return StatefulBuilder(
         builder: (ctx, setState) {
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Datenschutz-Einstellungen',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          return AppSheet(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Datenschutz-Einstellungen',
+                              style: t.displaySmall),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Du entscheidest, welche Daten wir verarbeiten '
+                            'dürfen. Die Auswahl lässt sich jederzeit in den '
+                            'Einstellungen ändern.',
+                            style:
+                                t.bodyMedium?.copyWith(color: c.labelSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    InsetSection(
+                      children: [
+                        const InsetSwitchRow(
+                          title: 'Notwendig',
+                          subtitle:
+                              'Erforderlich für die Grundfunktionen der App.',
+                          value: true,
+                          onChanged: null,
+                        ),
+                        InsetSwitchRow(
+                          title: 'Analytik & Crashlytics',
+                          subtitle:
+                              'Hilft uns, Abstürze zu beheben und die App zu '
+                              'verbessern.',
+                          value: analyticsEnabled,
+                          onChanged: (val) =>
+                              setState(() => analyticsEnabled = val),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter),
+                      child: AppButton(
+                        'Speichern',
+                        onPressed: () =>
+                            Navigator.of(ctx).pop(analyticsEnabled),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Diese App verwendet Cookies und ähnliche Technologien, um Ihnen die bestmögliche Erfahrung zu bieten.',
-                ),
-                const SizedBox(height: 16),
-                const SwitchListTile(
-                  value: true,
-                  onChanged: null, // cannot be disabled
-                  title: Text('Notwendig'),
-                  subtitle: Text('Erforderlich für die Grundfunktionen der App.'),
-                ),
-                SwitchListTile(
-                  value: analyticsEnabled,
-                  onChanged: (val) => setState(() => analyticsEnabled = val),
-                  title: const Text('Analytik & Crashlytics'),
-                  subtitle: const Text('Hilft uns, Abstürze zu beheben und die App zu verbessern.'),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(ctx).pop(analyticsEnabled),
-                    child: const Text('Speichern'),
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         },
@@ -111,89 +143,15 @@ class DiplomacyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
-    
-    // Diplomacy Design System Colors
-    const colorBackground = Color(0xFF0F1526);
-    const colorSurface = Color(0xFF1D2342);
-    // ignore: unused_local_variable
-    const colorSurfaceRaised = Color(0xFF242E4F);
-    const colorAccent = Color(0xFF5AC397);
-    const colorGold = Color(0xFFF0D36C);
-    const colorDanger = Color(0xFFE0685F);
-
-    final baseTextTheme = GoogleFonts.ibmPlexSansTextTheme(
-      ThemeData(brightness: Brightness.dark).textTheme,
-    );
-
-    final displayFont = GoogleFonts.fraunces();
+    final platform = defaultTargetPlatform;
 
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Diplomacy',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: const ColorScheme.dark(
-          primary: colorAccent,
-          secondary: colorGold,
-          surface: colorSurface,
-          error: colorDanger,
-          onPrimary: Colors.white,
-          onSecondary: Colors.black,
-          onSurface: Colors.white,
-          onError: Colors.white,
-        ),
-        scaffoldBackgroundColor: colorBackground,
-        textTheme: baseTextTheme.copyWith(
-          displayLarge: baseTextTheme.displayLarge?.merge(displayFont),
-          displayMedium: baseTextTheme.displayMedium?.merge(displayFont),
-          displaySmall: baseTextTheme.displaySmall?.merge(displayFont),
-          headlineLarge: baseTextTheme.headlineLarge?.merge(displayFont),
-          headlineMedium: baseTextTheme.headlineMedium?.merge(displayFont),
-          headlineSmall: baseTextTheme.headlineSmall?.merge(displayFont),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: colorBackground,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-        ),
-        cardTheme: CardTheme(
-          color: colorSurface,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: const BorderSide(color: Colors.white12, width: 1), // Hairline border
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: colorAccent,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            elevation: 0,
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: colorAccent, width: 2),
-          ),
-          filled: true,
-          fillColor: colorSurface,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(platform),
+      darkTheme: AppTheme.dark(platform),
+      themeMode: AppTheme.themeMode,
       locale: localeProvider.locale,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -247,7 +205,7 @@ class _InitializerScreenState extends State<InitializerScreen> {
     try {
       final me = await _authService.fetchMe();
       if (!mounted) return;
-      
+
       // Initialize Push Notifications if authenticated
       await PushService().init();
 
@@ -274,36 +232,60 @@ class _InitializerScreenState extends State<InitializerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.shield_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.secondary,
+    return const Scaffold(body: BrandMark(showActivity: true));
+  }
+}
+
+/// The launch identity: one gold seal, the wordmark, and — while something is
+/// loading — a quiet activity indicator. Reused by the login screen so the
+/// transition out of launch has nothing to jump.
+class BrandMark extends StatelessWidget {
+  const BrandMark({super.key, this.showActivity = false});
+
+  final bool showActivity;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            height: 76,
+            width: 76,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.accentMuted,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: c.accent.withOpacity(0.35), width: 1),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'DIPLOMACY',
-              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                color: Theme.of(context).colorScheme.secondary,
-                letterSpacing: 8,
-              ),
+            child: Icon(Icons.shield_outlined, size: 38, color: c.accent),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          Text(
+            'DIPLOMACY',
+            style: t.titleLarge?.copyWith(
+              color: c.labelPrimary,
+              letterSpacing: 6,
+              fontWeight: AppTypography.semibold,
             ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Negotiate. Ally. Betray.',
+            style: t.bodySmall?.copyWith(
+              color: c.labelTertiary,
+              letterSpacing: 0.4,
             ),
+          ),
+          if (showActivity) ...[
+            const SizedBox(height: AppSpacing.huge),
+            const AppLoader(),
           ],
-        ),
+        ],
       ),
     );
   }

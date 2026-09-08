@@ -114,11 +114,6 @@ class LobbyBloc extends ChangeNotifier {
     }
   }
 
-  List<GameModel> _parseGameList(dynamic jsonList) {
-    if (jsonList == null || jsonList is! List) return [];
-    return jsonList.map((e) => GameModel.fromJson(e)).toList();
-  }
-
   @override
   void dispose() {
     _isDisposed = true;

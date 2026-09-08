@@ -1,15 +1,25 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+
+import '../../config/app_config.dart';
 import '../../services/auth_service.dart';
 import '../../services/e2ee_service.dart';
 import '../../providers/locale_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ui_kit.dart';
 import '../legal/impressum_screen.dart';
 import '../legal/privacy_screen.dart';
 import '../auth/login_screen.dart';
 import 'link_account_screen.dart';
 
+/// Settings, as grouped sections.
+///
+/// Current values sit inline on the trailing edge so nothing has to be opened
+/// to be read, related options share a section, and the two destructive
+/// actions live alone at the very bottom in red — both behind a confirmation.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -20,253 +30,275 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final AuthService _authService = AuthService();
   final E2EEService _e2eeService = E2EEService();
-  String _selectedLanguage = 'English';
   bool _isResetting = false;
 
-  void _resetKey() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reset Encryption Key?'),
-        content: const Text('WARNING: You will lose access to all your previous End-to-End Encrypted chat history. This action cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Reset', style: TextStyle(color: Theme.of(context).colorScheme.error))),
-        ],
-      ),
+  static const Map<String, String> _languages = {
+    'en': 'English',
+    'ru': 'Русский',
+    'uk': 'Українська',
+    'de': 'Deutsch',
+    'cv': 'Чӑвашла',
+    'eo': 'Esperanto',
+  };
+
+  Future<void> _resetKey() async {
+    final ok = await confirm(
+      context,
+      title: 'Reset encryption key?',
+      message:
+          'You will lose access to every end-to-end encrypted conversation '
+          'you have had so far. This cannot be undone.',
+      confirmLabel: 'Reset key',
+      destructive: true,
     );
+    if (!ok) return;
 
-    if (confirm == true) {
-      setState(() => _isResetting = true);
-      await _e2eeService.resetKey();
-      setState(() => _isResetting = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Encryption keys reset successfully.')));
-      }
-    }
+    setState(() => _isResetting = true);
+    await _e2eeService.resetKey();
+    if (!mounted) return;
+    setState(() => _isResetting = false);
+    showToast(context, 'A new key pair was generated.');
   }
 
-  void _changeLanguage() async {
-    final lang = await showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Select Language'),
-        children: [
-          'en',
-          'ru',
-          'uk',
-          'de',
-          'cv',
-          'eo',
-        ].map((l) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(ctx, l),
-          child: Text(l),
-        )).toList(),
-      ),
+  Future<void> _changeLanguage(String current) async {
+    final lang = await showChoiceSheet<String>(
+      context,
+      title: 'Language',
+      selected: current,
+      options: [
+        for (final e in _languages.entries)
+          (value: e.key, label: e.value, detail: null),
+      ],
     );
+    if (lang == null || lang == current) return;
+    if (!mounted) return;
 
-    if (lang != null && lang != _selectedLanguage) {
-      if (!mounted) return;
-      setState(() => _selectedLanguage = lang);
-      // Update locale
-      Provider.of<LocaleProvider>(context, listen: false).setLocale(Locale(lang));
-      
-      // Optional: sync to backend
-      try {
-        await _authService.dio.post('/api/settings/language/', data: {'language': lang});
-      } catch (_) {}
-    }
-  }
+    Provider.of<LocaleProvider>(context, listen: false)
+        .setLocale(Locale(lang));
 
-  void _logout() async {
-    await _authService.logout();
-    // Normally you'd route back to login here. We'll rely on the app's main router listening to auth state.
-    if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
-  }
-
-  void _deleteAccount() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Konto löschen?'),
-        content: const Text(
-          'Diese Aktion ist unwiderruflich. Dein Konto und alle zugehörigen Daten werden dauerhaft gelöscht.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Abbrechen'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Konto löschen', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await _authService.deleteAccount();
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Fehler beim Löschen des Kontos: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  void _launchCommunity() async {
-    final url = Uri.parse('https://t.me/diplomacy_community'); // example URL
     try {
-      final success = await launchUrl(url, mode: LaunchMode.externalApplication);
-      if (!success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to open community link.')));
+      await _authService.dio
+          .post('/api/settings/language/', data: {'language': lang});
+    } catch (_) {
+      // The local choice already applied; syncing it is best-effort.
+    }
+  }
+
+  Future<void> _logout() async {
+    final ok = await confirm(
+      context,
+      title: 'Sign out?',
+      message: 'Your games stay where they are. You can sign back in anytime.',
+      confirmLabel: 'Sign out',
+    );
+    if (!ok) return;
+    await _authService.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    final ok = await confirm(
+      context,
+      title: 'Konto löschen?',
+      message:
+          'Diese Aktion ist unwiderruflich. Dein Konto und alle zugehörigen '
+          'Daten werden dauerhaft gelöscht.',
+      confirmLabel: 'Konto löschen',
+      cancelLabel: 'Abbrechen',
+      destructive: true,
+    );
+    if (!ok) return;
+
+    try {
+      await _authService.deleteAccount();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (mounted) {
+        showToast(context, 'Fehler beim Löschen des Kontos: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _launchCommunity() async {
+    final url = Uri.parse('https://t.me/diplomacy_community');
+    try {
+      final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        showToast(context, 'Could not open the community link.', isError: true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to open link: $e')));
+        showToast(context, 'Could not open the link. $e', isError: true);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final pub = _e2eeService.myPublicKeyBase64;
-    final pubKeyPreview = pub != null ? (pub.length > 16 ? '${pub.substring(0, 16)}...' : pub) : 'Not generated';
-
     final loc = AppLocalizations.of(context)!;
-    final errorColor = Theme.of(context).colorScheme.error;
+    final c = AppColors.of(context);
+    final t = Theme.of(context).textTheme;
+
+    final currentLang =
+        Provider.of<LocaleProvider>(context).locale?.languageCode ?? 'en';
+
+    final pub = _e2eeService.myPublicKeyBase64;
+    final fingerprint = pub == null
+        ? 'Not generated'
+        : (pub.length > 16 ? '${pub.substring(0, 16)}…' : pub);
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.settings)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(loc.preferences, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
+      body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics()),
+        slivers: [
+          SliverAppBar.large(
+            pinned: true,
+            backgroundColor: c.bgBase,
+            title: Text(loc.settings),
+          ),
+          SliverList.list(children: [
+            InsetSection(
+              header: loc.preferences,
               children: [
-                ListTile(
-                  leading: const Icon(Icons.language),
-                  title: Text(loc.language),
-                  subtitle: Text(_selectedLanguage),
-                  onTap: _changeLanguage,
+                InsetRow(
+                  title: loc.language,
+                  icon: CupertinoIcons.globe,
+                  value: _languages[currentLang] ?? 'English',
+                  onTap: () => _changeLanguage(currentLang),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.link),
-                  title: const Text('Konto verknüpfen / Link Accounts'),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const LinkAccountScreen()),
-                    );
-                  },
+                InsetRow(
+                  title: 'Linked devices',
+                  subtitle: 'Use one account on phone, web and Telegram',
+                  icon: CupertinoIcons.link,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const LinkAccountScreen()),
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(loc.security, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
+            InsetSection(
+              header: loc.security,
+              footer:
+                  'Private conversations are encrypted on your device. We '
+                  'never hold the key that opens them.',
               children: [
-                ListTile(
-                  leading: const Icon(Icons.lock),
-                  title: const Text('End-to-End Encryption'),
-                  subtitle: Text('Public Key: $pubKeyPreview'),
+                InsetRow(
+                  title: 'End-to-end encryption',
+                  subtitle: fingerprint,
+                  icon: CupertinoIcons.lock_fill,
+                  iconColor: c.green,
+                  showChevron: false,
+                  trailing: StatusPill(
+                    pub == null ? 'Not set up' : 'Active',
+                    tone: pub == null
+                        ? StatusTone.warning
+                        : StatusTone.positive,
+                  ),
                 ),
-                ListTile(
-                  leading: Icon(Icons.refresh, color: errorColor),
-                  title: Text('Reset Key Pair', style: TextStyle(color: errorColor)),
+                InsetRow(
+                  title: 'Reset key pair',
+                  icon: CupertinoIcons.arrow_2_circlepath,
+                  destructive: true,
+                  showChevron: false,
                   onTap: _isResetting ? null : _resetKey,
+                  trailing: _isResetting
+                      ? const CupertinoActivityIndicator(radius: 8)
+                      : null,
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(loc.about, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
+            InsetSection(
+              header: loc.about,
               children: [
-                ListTile(
-                  leading: const Icon(Icons.group),
-                  title: Text(loc.joinTheCommunity),
+                InsetRow(
+                  title: loc.joinTheCommunity,
+                  icon: CupertinoIcons.person_2_fill,
                   onTap: _launchCommunity,
                 ),
-                ListTile(
-                  leading: const Icon(Icons.info),
-                  title: Text(loc.appInfo),
-                  subtitle: Text(loc.version),
+                InsetRow(
+                  title: loc.appInfo,
+                  icon: CupertinoIcons.info_circle_fill,
+                  value: AppConfig.appVersion,
+                  showChevron: false,
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          Text('Rechtliches', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
+            InsetSection(
+              header: 'Rechtliches',
               children: [
-                ListTile(
-                  leading: const Icon(Icons.gavel),
-                  title: const Text('Impressum'),
+                InsetRow(
+                  title: 'Impressum',
+                  icon: CupertinoIcons.building_2_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ImpressumScreen()),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.privacy_tip),
-                  title: const Text('Datenschutzerklärung'),
+                InsetRow(
+                  title: 'Datenschutzerklärung',
+                  icon: CupertinoIcons.hand_raised_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const PrivacyScreen()),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.source),
-                  title: const Text('Open-Source Lizenzen'),
+                InsetRow(
+                  title: 'Open-Source Lizenzen',
+                  icon: CupertinoIcons.doc_text_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const LicensePage(
-                        applicationName: 'Conspa Diplomacy',
-                        applicationVersion: '1.0.0',
+                      builder: (context) => Theme(
+                        data: Theme.of(context),
+                        child: LicensePage(
+                          applicationName: AppConfig.appName,
+                          applicationVersion: AppConfig.appVersion,
+                          applicationIcon: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            child: Icon(Icons.shield_outlined,
+                                size: 40, color: c.accent),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Column(
+            InsetSection(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: Text(loc.logOut),
+                InsetRow(
+                  title: loc.logOut,
+                  icon: CupertinoIcons.square_arrow_right,
+                  showChevron: false,
                   onTap: _logout,
                 ),
-                ListTile(
-                  leading: Icon(Icons.delete_forever, color: errorColor),
-                  title: Text('Konto löschen', style: TextStyle(color: errorColor)),
+                InsetRow(
+                  title: 'Konto löschen',
+                  icon: CupertinoIcons.trash_fill,
+                  destructive: true,
+                  showChevron: false,
                   onTap: _deleteAccount,
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 32),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.gutter, vertical: AppSpacing.xxxl),
+              child: Text(
+                '${AppConfig.appName} ${AppConfig.appVersion}',
+                textAlign: TextAlign.center,
+                style: t.bodySmall?.copyWith(color: c.labelTertiary),
+              ),
+            ),
+          ]),
         ],
       ),
     );
