@@ -57,6 +57,7 @@ bool _isGenerating = false;
       final res = await _authService.dio.post('/api/auth/link/generate/');
       final data = res.data;
       
+      await _e2eeService.init();
       final keyStr = await _e2eeService.exportKey();
       String fullCode = data['code'];
       if (keyStr != null) {
