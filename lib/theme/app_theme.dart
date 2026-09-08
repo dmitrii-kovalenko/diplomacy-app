@@ -174,7 +174,7 @@ class AppColors extends ThemeExtension<AppColors> {
     accentMuted: Color(0x247CDED8),
     onAccent: Color(0xFF0C1616),
     red: Color(0xFFFF453A),
-    green: Color(0xFF30D158),
+    green: Color(0xFF08D6A2),
     orange: Color(0xFFFF9F0A),
     scrim: Color(0x8C000000),
   );
@@ -198,7 +198,7 @@ class AppColors extends ThemeExtension<AppColors> {
     accentMuted: Color(0x1F1C5F5A),
     onAccent: Color(0xFFFFFFFF),
     red: Color(0xFFFF3B30),
-    green: Color(0xFF34C759),
+    green: Color(0xFF04A87E),
     orange: Color(0xFFFF9500),
     scrim: Color(0x73000000),
   );
