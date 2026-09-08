@@ -94,7 +94,8 @@ class _MapViewerState extends State<MapViewer> {
         }
       }
 
-      final pathElements = document.findAllElements('path');
+      final gProvinces = document.findAllElements('g').where((e) => e.getAttribute('id') == 'provinces').firstOrNull;
+      final pathElements = gProvinces != null ? gProvinces.findAllElements('path') : document.findAllElements('path');
       for (final element in pathElements) {
         final id = element.getAttribute('id');
         final d = element.getAttribute('d');

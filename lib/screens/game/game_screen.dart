@@ -178,6 +178,34 @@ class _GameScreenState extends State<GameScreen> {
     return parts.isEmpty ? 'Game ${widget.gameId}' : parts.join(' · ');
   }
 
+  Map<String, Color> _computeProvinceColors() {
+    if (_gameState == null) return {};
+    final scs = _gameState!['sc_ownership'] as List<dynamic>? ?? [];
+    final empires = _gameState!['empires'] as List<dynamic>? ?? [];
+    
+    final Map<String, Color> empireColors = {};
+    for (final e in empires) {
+      final code = e['code'] as String?;
+      final colorStr = e['color'] as String?;
+      if (code != null && colorStr != null) {
+        if (colorStr.startsWith('#') && colorStr.length == 7) {
+          final hex = colorStr.substring(1);
+          empireColors[code] = Color(int.parse('0xFF$hex')).withOpacity(0.55);
+        }
+      }
+    }
+
+    final Map<String, Color> colors = {};
+    for (final sc in scs) {
+      final prov = sc['province_code'] as String?;
+      final emp = sc['empire_code'] as String?;
+      if (prov != null && emp != null && empireColors.containsKey(emp)) {
+        colors[prov] = empireColors[emp]!;
+      }
+    }
+    return colors;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
@@ -294,6 +322,7 @@ class _GameScreenState extends State<GameScreen> {
 
                   return MapViewer(
                     svgString: _svgString ?? '<svg></svg>',
+                    provinceColors: _computeProvinceColors(),
                     onSvgParsed: (mapData) {
                       bloc.setMapData(mapData);
                     },
