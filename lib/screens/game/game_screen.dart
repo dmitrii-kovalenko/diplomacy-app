@@ -63,7 +63,10 @@ class _GameScreenState extends State<GameScreen> {
       });
     } catch (e) {
       debugPrint('Failed to load game: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        showToast(context, 'MAP/GAME ERROR: $e', isError: true);
+      }
     }
   }
 
