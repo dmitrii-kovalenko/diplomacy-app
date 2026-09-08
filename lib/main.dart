@@ -220,7 +220,32 @@ class _InitializerScreenState extends State<InitializerScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      _navigateTo(const LoginScreen());
+      // If it's explicitly a 401, the interceptor would have logged us out.
+      // If the tokens are gone, we are truly logged out.
+      final currentToken = await _storage.read(key: 'access_token');
+      if (currentToken == null) {
+        _navigateTo(const LoginScreen());
+      } else {
+        // Network error or 500. Do not log out! Just show a retry button or go to lobby in offline mode.
+        // For now, let's just show an error state that lets them retry.
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Connection Error'),
+            content: const Text('Could not connect to the server.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _checkAuth(); // Retry
+                },
+                child: const Text('Retry'),
+              )
+            ],
+          ),
+        );
+      }
     }
   }
 

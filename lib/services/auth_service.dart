@@ -48,7 +48,14 @@ class AuthService {
                 final retryResponse = await Dio().fetch(e.requestOptions);
                 return handler.resolve(retryResponse);
               } catch (refreshError) {
-                await logout();
+                if (refreshError is DioException && refreshError.response != null && refreshError.response!.statusCode! >= 400 && refreshError.response!.statusCode! < 500) {
+                  // The refresh token is genuinely invalid or expired.
+                  await logout();
+                } else {
+                  // Network error or 500 server error during refresh. Do not log out!
+                  // Just rethrow so the UI can show a network error.
+                  return handler.next(e);
+                }
               }
             } else {
               await logout();
