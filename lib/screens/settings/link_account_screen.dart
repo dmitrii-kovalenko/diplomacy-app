@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../services/auth_service.dart';
+import '../../services/e2ee_service.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui_kit.dart';
 import '../auth/login_screen.dart';
@@ -27,8 +29,35 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
   final TextEditingController _codeController = TextEditingController();
 
   int _mode = 0; // 0 = show a code, 1 = enter one
-  bool _isGenerating = false;
+bool _isGenerating = false;
   bool _isMerging = false;
+  final E2EEService _e2eeService = E2EEService();
+  final TextEditingController _importKeyController = TextEditingController();
+  
+  Future<void> _exportKey() async {
+    final key = await _e2eeService.exportKey();
+    if (key != null) {
+      await Clipboard.setData(ClipboardData(text: key));
+      if (mounted) showToast(context, 'Private key copied to clipboard');
+    } else {
+      if (mounted) showToast(context, 'No key generated yet', isError: true);
+    }
+  }
+
+  Future<void> _importKey() async {
+    final val = _importKeyController.text.trim();
+    if (val.isEmpty) return;
+    try {
+      await _e2eeService.importKey(val);
+      _importKeyController.clear();
+      if (mounted) {
+        showToast(context, 'Key imported successfully 🔒');
+        FocusScope.of(context).unfocus();
+      }
+    } catch (e) {
+      if (mounted) showToast(context, 'Invalid key format', isError: true);
+    }
+  }
   String? _generatedCode;
   DateTime? _expiresAt;
   Timer? _timer;
@@ -222,6 +251,41 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
           loading: _isGenerating,
           onPressed: _generateCode,
         ),
+        const SizedBox(height: AppSpacing.xxl),
+        const Divider(),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'E2E Encryption Key',
+          style: t.titleMedium?.copyWith(color: c.labelPrimary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Account linking does NOT transfer your private message key. You must copy it manually.',
+          style: t.bodySmall?.copyWith(color: c.labelSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppButton(
+          'Copy Private Key',
+          style: AppButtonStyle.tinted,
+          onPressed: _exportKey,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _importKeyController,
+          decoration: const InputDecoration(
+            labelText: 'Paste Private Key (JWK)',
+            hintText: '{"kty":"EC"...}',
+          ),
+          maxLines: 2,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppButton(
+          'Import Key',
+          style: AppButtonStyle.tinted,
+          onPressed: _importKey,
+        ),
       ],
     );
   }
@@ -282,6 +346,41 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
           'Link this device',
           loading: _isMerging,
           onPressed: ready ? _mergeAccount : null,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        const Divider(),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'E2E Encryption Key',
+          style: t.titleMedium?.copyWith(color: c.labelPrimary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Account linking does NOT transfer your private message key. You must copy it manually.',
+          style: t.bodySmall?.copyWith(color: c.labelSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppButton(
+          'Copy Private Key',
+          style: AppButtonStyle.tinted,
+          onPressed: _exportKey,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _importKeyController,
+          decoration: const InputDecoration(
+            labelText: 'Paste Private Key (JWK)',
+            hintText: '{"kty":"EC"...}',
+          ),
+          maxLines: 2,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppButton(
+          'Import Key',
+          style: AppButtonStyle.tinted,
+          onPressed: _importKey,
         ),
       ],
     );

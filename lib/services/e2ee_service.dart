@@ -115,4 +115,61 @@ class E2EEService {
       return '[Decryption Failed]';
     }
   }
+
+  Future<String?> exportKey() async {
+    final privBase64 = await _storage.read(key: 'e2ee_priv_key');
+    if (privBase64 == null) return null;
+    
+    final privBytes = base64Decode(privBase64);
+    final keyPair = await _ecdh.newKeyPairFromSeed(privBytes);
+    final pubKey = await keyPair.extractPublicKey();
+    
+    String b64url(List<int> bytes) {
+      return base64UrlEncode(bytes).replaceAll('=', '');
+    }
+    
+    final jwk = {
+      "kty": "EC",
+      "crv": "P-256",
+      "d": b64url(privBytes),
+      "x": b64url(pubKey.x),
+      "y": b64url(pubKey.y),
+      "ext": true
+    };
+    return jsonEncode(jwk);
+  }
+
+  Future<void> importKey(String input) async {
+    try {
+      List<int> privBytes;
+      if (input.trim().startsWith('{')) {
+        final jwk = jsonDecode(input);
+        if (jwk['kty'] != 'EC' || jwk['crv'] != 'P-256' || jwk['d'] == null) {
+          throw Exception('Invalid JWK format');
+        }
+        String dStr = jwk['d'];
+        while (dStr.length % 4 != 0) {
+          dStr += '=';
+        }
+        privBytes = base64Url.decode(dStr);
+      } else {
+        privBytes = base64Decode(input);
+      }
+      
+      _keyPair = await _ecdh.newKeyPairFromSeed(privBytes);
+      final pubKey = await _keyPair!.extractPublicKey();
+      myPublicKeyBase64 = base64Encode([4, ...pubKey.x, ...pubKey.y]);
+      
+      await _storage.write(key: 'e2ee_priv_key', value: base64Encode(privBytes));
+      
+      final dio = AuthService().dio;
+      try {
+        await dio.post('/api/me/key/', data: {'public_key': myPublicKeyBase64});
+      } catch (e) {
+        debugPrint('Failed to upload imported public key: $e');
+      }
+    } catch (e) {
+      throw Exception('Invalid key format');
+    }
+  }
 }
