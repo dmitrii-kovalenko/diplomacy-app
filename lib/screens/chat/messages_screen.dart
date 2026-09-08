@@ -97,7 +97,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           final bytes = base64Decode(peerPub);
                           final hash = await Sha256().hash(bytes);
                           final fp = hash.bytes.take(16).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
-                          if (mounted) showToast(context, 'Their fingerprint: $fp');
+                          await Clipboard.setData(ClipboardData(text: fp));
+                          if (mounted) showToast(context, 'Fingerprint copied to clipboard');
                         }
                       },
                       child: Row(
