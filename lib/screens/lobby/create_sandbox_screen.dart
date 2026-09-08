@@ -41,7 +41,7 @@ class _CreateSandboxScreenState extends State<CreateSandboxScreen> {
   void _createSandbox() async {
     setState(() => _isLoading = true);
     try {
-      await _lobbyService.createSandbox({'map_id': _selectedMap});
+      await _lobbyService.createSandbox({'game_map_id': _selectedMap});
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {

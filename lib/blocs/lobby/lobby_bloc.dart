@@ -77,15 +77,32 @@ class LobbyBloc extends ChangeNotifier {
     notifyListeners();
 
     try {
+      
       final data = await _lobbyService.fetchLobby();
       if (_isDisposed) return;
       
-      yourTurn = _parseGameList(data['your_turn']);
-      waiting = _parseGameList(data['waiting']);
-      openLobbies = _parseGameList(data['open_lobbies']);
-      surrendered = _parseGameList(data['surrendered']);
-      observed = _parseGameList(data['observed']);
-      completed = _parseGameList(data['completed']);
+      final List<dynamic> games = data['games'] ?? [];
+      
+      // Simple categorization based on status
+      yourTurn = [];
+      waiting = [];
+      openLobbies = [];
+      surrendered = [];
+      observed = [];
+      completed = [];
+      
+      for (var json in games) {
+        final game = GameModel.fromJson(json);
+        if (game.status == 2) {
+            completed.add(game);
+        } else if (game.status == 0) {
+            openLobbies.add(game);
+        } else {
+            // For now, put active games in yourTurn
+            yourTurn.add(game);
+        }
+      }
+
     } catch (e) {
       if (_isDisposed) return;
       error = e.toString();

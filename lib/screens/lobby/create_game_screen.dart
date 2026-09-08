@@ -53,7 +53,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
     try {
       await _lobbyService.createGame({
         'name': _nameController.text,
-        'map_id': _selectedMap,
+        'game_map_id': _selectedMap,
         'turn_length': _turnLength,
         'random_assignment': _randomAssignment,
         'is_anonymous': _isAnonymous,
