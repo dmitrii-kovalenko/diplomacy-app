@@ -141,8 +141,17 @@ class E2EEService {
 
   Future<void> importKey(String input) async {
     try {
+      input = input.trim();
+      if (input.startsWith('eyJ')) {
+        try {
+          String normalized = input;
+          while (normalized.length % 4 != 0) normalized += '=';
+          input = utf8.decode(base64Decode(normalized));
+        } catch (_) {}
+      }
+
       List<int> privBytes;
-      if (input.trim().startsWith('{')) {
+      if (input.startsWith('{')) {
         final jwk = jsonDecode(input);
         if (jwk['kty'] != 'EC' || jwk['crv'] != 'P-256' || jwk['d'] == null) {
           throw Exception('Invalid JWK format');
