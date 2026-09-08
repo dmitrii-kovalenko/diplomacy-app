@@ -117,6 +117,9 @@ class _MapViewerState extends State<MapViewer> {
       }
     } catch (e) {
       debugPrint('Error parsing SVG: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('SVG ERROR: $e')));
+      }
     }
   }
 
