@@ -210,11 +210,10 @@ bool _isGenerating = false;
             controller: _codeController,
             textAlign: TextAlign.center,
             textCapitalization: TextCapitalization.characters,
-            maxLength: 6,
             autocorrect: false,
             cursorColor: c.accent,
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-\=\_\+]')),
               TextInputFormatter.withFunction(
                   (_, next) => next.copyWith(text: next.text.toUpperCase())),
             ],
