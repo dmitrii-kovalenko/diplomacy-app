@@ -98,8 +98,16 @@ class LobbyBloc extends ChangeNotifier {
         } else if (game.status == 0) {
             openLobbies.add(game);
         } else {
-            // For now, put active games in yourTurn
-            yourTurn.add(game);
+            // Active game
+            if (json['my_empire_code'] == null) {
+              observed.add(game);
+            } else {
+              if (json['my_is_ready'] == true) {
+                waiting.add(game);
+              } else {
+                yourTurn.add(game);
+              }
+            }
         }
       }
 

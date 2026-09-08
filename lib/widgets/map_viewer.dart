@@ -52,20 +52,28 @@ class _MapViewerState extends State<MapViewer> {
   @override
   void initState() {
     super.initState();
-    _parseSvg();
+    _parseSvg().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void didUpdateWidget(covariant MapViewer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.svgString != widget.svgString) {
-      _parseSvg();
+      _parseSvg().then((_) {
+        if (mounted) setState(() {});
+      });
     }
   }
 
-  void _parseSvg() {
+  Future<void> _parseSvg() async {
     _paths.clear();
     final Map<String, ProvinceData> provinceDataMap = {};
+    
+    // Yield to let page transition finish before heavy parsing
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
     
     try {
       final document = XmlDocument.parse(widget.svgString);
