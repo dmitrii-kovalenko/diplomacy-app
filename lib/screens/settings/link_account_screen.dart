@@ -245,7 +245,7 @@ bool _isGenerating = false;
               _mergeAccount();
             }
           },
-          type: AppButtonType.secondary,
+          style: AppButtonStyle.tinted,
         ),
         const SizedBox(height: AppSpacing.sm),
         AppButton(
