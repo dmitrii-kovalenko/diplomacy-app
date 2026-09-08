@@ -5,6 +5,9 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
 import '../../services/e2ee_service.dart';
 import '../../providers/locale_provider.dart';
+import '../legal/impressum_screen.dart';
+import '../legal/privacy_screen.dart';
+import '../auth/login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -82,6 +85,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Konto löschen?'),
+        content: const Text(
+          'Diese Aktion ist unwiderruflich. Dein Konto und alle zugehörigen Daten werden dauerhaft gelöscht.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Konto löschen', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _authService.deleteAccount();
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Fehler beim Löschen des Kontos: $e')),
+          );
+        }
+      }
+    }
+  }
+
   void _launchCommunity() async {
     final url = Uri.parse('https://t.me/diplomacy_community'); // example URL
     try {
@@ -139,10 +182,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(loc.version),
           ),
           const Divider(),
+          const Padding(padding: EdgeInsets.all(16), child: Text('Rechtliches', style: TextStyle(fontWeight: FontWeight.bold))),
+          ListTile(
+            leading: const Icon(Icons.gavel),
+            title: const Text('Impressum'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ImpressumScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip),
+            title: const Text('Datenschutzerklärung'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.source),
+            title: const Text('Open-Source Lizenzen'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const LicensePage(
+                  applicationName: 'Conspa Diplomacy',
+                  applicationVersion: '1.0.0',
+                ),
+              ),
+            ),
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: Text(loc.logOut),
             onTap: _logout,
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            title: const Text('Konto löschen', style: TextStyle(color: Colors.red)),
+            onTap: _deleteAccount,
           ),
         ],
       ),

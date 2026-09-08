@@ -22,6 +22,7 @@ dependencies:
 
   firebase_core: ^2.24.2
   firebase_messaging: ^14.7.9
+  firebase_analytics: ^10.8.0
   dio: ^5.4.0
   flutter_secure_storage: ^9.0.0
   sign_in_with_apple: ^6.1.1

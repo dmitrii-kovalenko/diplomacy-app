@@ -10,6 +10,7 @@ import 'screens/lobby/lobby_screen.dart';
 import 'services/auth_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'services/push_service.dart';
 
@@ -19,10 +20,77 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Handle background message
 }
 
+/// Shows a consent bottom sheet and waits for the user's choice.
+/// Returns `true` if analytics consent was granted, `false` otherwise.
+Future<bool> _showConsentSheet(BuildContext context) async {
+  bool analyticsEnabled = false;
+  final result = await showModalBottomSheet<bool>(
+    context: context,
+    isDismissible: false,
+    enableDrag: false,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Datenschutz-Einstellungen',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Diese App verwendet Cookies und ähnliche Technologien, um Ihnen die bestmögliche Erfahrung zu bieten.',
+                ),
+                const SizedBox(height: 16),
+                const SwitchListTile(
+                  value: true,
+                  onChanged: null, // cannot be disabled
+                  title: Text('Notwendig'),
+                  subtitle: Text('Erforderlich für die Grundfunktionen der App.'),
+                ),
+                SwitchListTile(
+                  value: analyticsEnabled,
+                  onChanged: (val) => setState(() => analyticsEnabled = val),
+                  title: const Text('Analytik & Crashlytics'),
+                  subtitle: const Text('Hilft uns, Abstürze zu beheben und die App zu verbessern.'),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(analyticsEnabled),
+                    child: const Text('Speichern'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+  return result ?? false;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Check analytics consent stored from a previous session
+  const storage = FlutterSecureStorage();
+  final consentValue = await storage.read(key: 'analytics_consent');
+
+  // Apply consent to Firebase Analytics (consent banner shown later by InitializerScreen
+  // if the key is absent; here we handle already-set values).
+  if (consentValue != null) {
+    final enabled = consentValue == 'true';
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(enabled);
+  }
 
   runApp(
     MultiProvider(
@@ -111,6 +179,17 @@ class _InitializerScreenState extends State<InitializerScreen> {
   }
 
   Future<void> _checkAuth() async {
+    // Show consent banner on first launch (when analytics_consent key is absent)
+    final consentValue = await _storage.read(key: 'analytics_consent');
+    if (consentValue == null && mounted) {
+      final granted = await _showConsentSheet(context);
+      await _storage.write(
+        key: 'analytics_consent',
+        value: granted ? 'true' : 'false',
+      );
+      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(granted);
+    }
+
     final token = await _storage.read(key: 'access_token');
     if (!mounted) return;
 

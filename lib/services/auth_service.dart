@@ -126,4 +126,11 @@ class AuthService {
     final response = await dio.get('/api/me/');
     return response.data as Map<String, dynamic>;
   }
+
+  Future<void> deleteAccount() async {
+    await dio.delete('/api/me/');
+    await storage.delete(key: 'access_token');
+    await storage.delete(key: 'refresh_token');
+    await storage.delete(key: 'analytics_consent');
+  }
 }
