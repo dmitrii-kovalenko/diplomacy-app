@@ -195,7 +195,7 @@ bool _isGenerating = false;
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Enter the six-character code shown on your other device.',
+          'Paste the code from your other device here.',
           style: t.bodyMedium?.copyWith(color: c.labelSecondary),
           textAlign: TextAlign.center,
         ),
@@ -236,6 +236,18 @@ bool _isGenerating = false;
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
+        AppButton(
+          'Paste from clipboard & Link',
+          onPressed: () async {
+            final data = await Clipboard.getData('text/plain');
+            if (data != null && data.text != null) {
+              _codeController.text = data.text!;
+              _mergeAccount();
+            }
+          },
+          type: AppButtonType.secondary,
+        ),
+        const SizedBox(height: AppSpacing.sm),
         AppButton(
           'Link this device',
           loading: _isMerging,
