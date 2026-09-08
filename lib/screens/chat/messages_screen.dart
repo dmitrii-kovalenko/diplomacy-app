@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../services/e2ee_service.dart';
+import 'package:cryptography/cryptography.dart';
+import 'dart:convert';
 
 import '../../blocs/chat/chat_bloc.dart';
 import '../../theme/app_theme.dart';
@@ -80,15 +83,33 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
                   if (isE2ee)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(CupertinoIcons.lock_fill,
-                            size: 10, color: c.green),
-                        const SizedBox(width: 4),
-                        Text('End-to-end encrypted',
-                            style: t.labelSmall?.copyWith(color: c.green)),
-                      ],
+                    GestureDetector(
+                      onTap: () async {
+                        final members = conv['members'] as List<dynamic>? ?? [];
+                        String? peerPub;
+                        for (final m in members) {
+                          if (m['public_key'] != E2EEService().myPublicKeyBase64 && m['public_key'] != null) {
+                            peerPub = m['public_key'];
+                            break;
+                          }
+                        }
+                        if (peerPub != null) {
+                          final bytes = base64Decode(peerPub);
+                          final hash = await Sha256().hash(bytes);
+                          final fp = hash.bytes.take(16).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+                          if (mounted) showToast(context, 'Their fingerprint: $fp');
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.lock_fill,
+                              size: 10, color: c.green),
+                          const SizedBox(width: 4),
+                          Text('End-to-end encrypted (tap to verify)',
+                              style: t.labelSmall?.copyWith(color: c.green)),
+                        ],
+                      ),
                     ),
                 ],
               ),
