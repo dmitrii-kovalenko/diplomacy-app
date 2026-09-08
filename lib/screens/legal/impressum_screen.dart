@@ -7,40 +7,40 @@ class ImpressumScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Impressum')),
-      body: const SingleChildScrollView(
-        padding: EdgeInsets.all(20),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Angaben gemäß § 5 TMG',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'Verantwortlicher:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 4),
-            Text('Max Mustermann'),
-            Text('Musterstraße 1'),
-            Text('12345 Musterstadt'),
-            Text('Deutschland'),
-            SizedBox(height: 16),
+            const SizedBox(height: 4),
+            const Text('Max Mustermann'),
+            const Text('Musterstraße 1'),
+            const Text('12345 Musterstadt'),
+            const Text('Deutschland'),
+            const SizedBox(height: 16),
             Text(
               'Kontakt:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 4),
-            Text('E-Mail: kontakt@example.com'),
-            Text('Telefon: +49 123 456789'),
-            SizedBox(height: 16),
+            const SizedBox(height: 4),
+            const Text('E-Mail: kontakt@example.com'),
+            const Text('Telefon: +49 123 456789'),
+            const SizedBox(height: 16),
             Text(
               'Haftungsausschluss:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 4),
-            Text(
+            const SizedBox(height: 4),
+            const Text(
               'Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. '
               'Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte '
               'kann jedoch keine Gewähr übernommen werden.',

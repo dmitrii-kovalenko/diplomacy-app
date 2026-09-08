@@ -73,12 +73,12 @@ class LobbyScreen extends StatelessWidget {
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  _buildSection('Your Turn', bloc.yourTurn),
-                  _buildSection('Waiting', bloc.waiting),
-                  _buildSection('Open Lobbies', bloc.openLobbies),
-                  _buildSection('Surrendered', bloc.surrendered),
-                  _buildSection('Observed', bloc.observed),
-                  _buildSection('Completed', bloc.completed),
+                  _buildSection(context, 'Your Turn', bloc.yourTurn),
+                  _buildSection(context, 'Waiting', bloc.waiting),
+                  _buildSection(context, 'Open Lobbies', bloc.openLobbies),
+                  _buildSection(context, 'Surrendered', bloc.surrendered),
+                  _buildSection(context, 'Observed', bloc.observed),
+                  _buildSection(context, 'Completed', bloc.completed),
                 ],
               ),
             );
@@ -122,7 +122,7 @@ class LobbyScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(String title, List games) {
+  Widget _buildSection(BuildContext context, String title, List games) {
     if (games.isEmpty) return const SizedBox.shrink();
     
     return Column(
@@ -130,14 +130,14 @@ class LobbyScreen extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         ),
         ...games.map((game) => GameCard(
           game: game,
           onEnter: () {
             // Navigate to game view
           },
-          onJoin: game.phase == 'lobby' ? () {} : null,
+          onJoin: game['status'] == 'lobby' ? () {} : null,
         )),
       ],
     );

@@ -13,6 +13,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'services/push_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -37,9 +38,9 @@ Future<bool> _showConsentSheet(BuildContext context) async {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Datenschutz-Einstellungen',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -111,40 +112,84 @@ class DiplomacyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
     
+    // Diplomacy Design System Colors
+    const colorBackground = Color(0xFF0F1526);
+    const colorSurface = Color(0xFF1D2342);
+    // ignore: unused_local_variable
+    const colorSurfaceRaised = Color(0xFF242E4F);
+    const colorAccent = Color(0xFF5AC397);
+    const colorGold = Color(0xFFF0D36C);
+    const colorDanger = Color(0xFFE0685F);
+
+    final baseTextTheme = GoogleFonts.ibmPlexSansTextTheme(
+      ThemeData(brightness: Brightness.dark).textTheme,
+    );
+
+    final displayFont = GoogleFonts.fraunces();
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Diplomacy',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4A54A), // Gold / amber for Diplomacy
-          brightness: Brightness.dark,
+        colorScheme: const ColorScheme.dark(
+          primary: colorAccent,
+          secondary: colorGold,
+          surface: colorSurface,
+          error: colorDanger,
+          onPrimary: Colors.white,
+          onSecondary: Colors.black,
+          onSurface: Colors.white,
+          onError: Colors.white,
         ),
-        scaffoldBackgroundColor: const Color(0xFF1A1A2E),
+        scaffoldBackgroundColor: colorBackground,
+        textTheme: baseTextTheme.copyWith(
+          displayLarge: baseTextTheme.displayLarge?.merge(displayFont),
+          displayMedium: baseTextTheme.displayMedium?.merge(displayFont),
+          displaySmall: baseTextTheme.displaySmall?.merge(displayFont),
+          headlineLarge: baseTextTheme.headlineLarge?.merge(displayFont),
+          headlineMedium: baseTextTheme.headlineMedium?.merge(displayFont),
+          headlineSmall: baseTextTheme.headlineSmall?.merge(displayFont),
+        ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF16213E),
-          foregroundColor: Color(0xFFE0C97F),
-          elevation: 2,
+          backgroundColor: colorBackground,
+          foregroundColor: Colors.white,
+          elevation: 0,
           centerTitle: true,
         ),
         cardTheme: CardTheme(
-          color: const Color(0xFF16213E),
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          color: colorSurface,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Colors.white12, width: 1), // Hairline border
+          ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFD4A54A),
-            foregroundColor: const Color(0xFF1A1A2E),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            backgroundColor: colorAccent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            elevation: 0,
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white24),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: colorAccent),
+          ),
           filled: true,
-          fillColor: const Color(0xFF0F3460),
+          fillColor: colorSurface,
         ),
         useMaterial3: true,
       ),
@@ -228,8 +273,8 @@ class _InitializerScreenState extends State<InitializerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF1A1A2E),
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -237,25 +282,23 @@ class _InitializerScreenState extends State<InitializerScreen> {
             Icon(
               Icons.shield_outlined,
               size: 80,
-              color: Color(0xFFD4A54A),
+              color: Theme.of(context).colorScheme.secondary,
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             Text(
               'DIPLOMACY',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFE0C97F),
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                color: Theme.of(context).colorScheme.secondary,
                 letterSpacing: 8,
               ),
             ),
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
             SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Color(0xFFD4A54A),
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],

@@ -39,6 +39,7 @@ dependencies:
   pointycastle: ^4.0.0
   cryptography: ^2.9.0
   url_launcher: ^6.3.1
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

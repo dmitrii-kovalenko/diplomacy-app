@@ -23,7 +23,7 @@ class ConversationsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('New Conversation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text('New Conversation', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 8,
@@ -84,9 +84,25 @@ class ConversationsScreen extends StatelessWidget {
                 }
                 final title = conv['title'] ?? 'Conversation';
                 return ListTile(
-                  title: Text(title, style: TextStyle(fontWeight: unread > 0 ? FontWeight.bold : FontWeight.normal)),
+                  title: Text(
+                    title, 
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: unread > 0 ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
                   subtitle: Text(preview, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: unread > 0 ? CircleAvatar(radius: 12, child: Text('$unread', style: const TextStyle(fontSize: 12))) : null,
+                  trailing: unread > 0 
+                    ? CircleAvatar(
+                        radius: 12, 
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        child: Text(
+                          '$unread', 
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                      ) 
+                    : null,
                   onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => MessagesScreen(bloc: bloc, conversationId: conv['id'])));
                   },

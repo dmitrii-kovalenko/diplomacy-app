@@ -158,7 +158,7 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('Expires in: $_timeLeft', style: const TextStyle(color: Colors.red)),
+                    Text('Expires in: $_timeLeft', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   ] else ...[
                     ElevatedButton(
                       onPressed: _isGenerating ? null : _generateCode,
@@ -191,7 +191,7 @@ class _LinkAccountScreenState extends State<LinkAccountScreen> {
                     textCapitalization: TextCapitalization.characters,
                     maxLength: 6,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(letterSpacing: 8.0, fontSize: 24),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(letterSpacing: 8.0),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(

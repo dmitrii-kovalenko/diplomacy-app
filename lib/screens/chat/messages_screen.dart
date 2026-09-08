@@ -38,7 +38,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
               title: Row(
                 children: [
                   Text(title),
-                  if (isE2ee) const Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.lock, color: Colors.green, size: 16)),
+                  if (isE2ee) Padding(
+                    padding: const EdgeInsets.only(left: 8), 
+                    child: Icon(Icons.lock, color: Theme.of(context).colorScheme.primary, size: 16),
+                  ),
                 ],
               ),
             ),
@@ -57,14 +60,21 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isMine ? Colors.blue[100] : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
+                            color: isMine ? Theme.of(context).colorScheme.primary.withOpacity(0.3) : Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white12, width: 1),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (!isMine) Text(msg['sender_empire_name'] ?? '', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                              Text(msg['text'] ?? '[decryption pending]'),
+                              if (!isMine) Text(
+                                msg['sender_empire_name'] ?? '', 
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                msg['text'] ?? '[decryption pending]',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
                             ],
                           ),
                         ),

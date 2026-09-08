@@ -31,7 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         content: const Text('WARNING: You will lose access to all your previous End-to-End Encrypted chat history. This action cannot be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Reset', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Reset', style: TextStyle(color: Theme.of(context).colorScheme.error))),
         ],
       ),
     );
@@ -101,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Konto löschen', style: TextStyle(color: Colors.red)),
+            child: Text('Konto löschen', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -146,90 +146,127 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final pubKeyPreview = pub != null ? (pub.length > 16 ? '${pub.substring(0, 16)}...' : pub) : 'Not generated';
 
     final loc = AppLocalizations.of(context)!;
+    final errorColor = Theme.of(context).colorScheme.error;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.settings)),
       body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Padding(padding: const EdgeInsets.all(16), child: Text(loc.preferences, style: const TextStyle(fontWeight: FontWeight.bold))),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: Text(loc.language),
-            subtitle: Text(_selectedLanguage),
-            onTap: _changeLanguage,
-          ),
-          ListTile(
-            leading: const Icon(Icons.link),
-            title: const Text('Konto verknüpfen / Link Accounts'),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LinkAccountScreen()),
-              );
-            },
-          ),
-          const Divider(),
-          Padding(padding: const EdgeInsets.all(16), child: Text(loc.security, style: const TextStyle(fontWeight: FontWeight.bold))),
-          ListTile(
-            leading: const Icon(Icons.lock),
-            title: const Text('End-to-End Encryption'),
-            subtitle: Text('Public Key: $pubKeyPreview'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.refresh, color: Colors.red),
-            title: const Text('Reset Key Pair', style: TextStyle(color: Colors.red)),
-            onTap: _isResetting ? null : _resetKey,
-          ),
-          const Divider(),
-          Padding(padding: const EdgeInsets.all(16), child: Text(loc.about, style: const TextStyle(fontWeight: FontWeight.bold))),
-          ListTile(
-            leading: const Icon(Icons.group),
-            title: Text(loc.joinTheCommunity),
-            onTap: _launchCommunity,
-          ),
-          ListTile(
-            leading: const Icon(Icons.info),
-            title: Text(loc.appInfo),
-            subtitle: Text(loc.version),
-          ),
-          const Divider(),
-          const Padding(padding: EdgeInsets.all(16), child: Text('Rechtliches', style: TextStyle(fontWeight: FontWeight.bold))),
-          ListTile(
-            leading: const Icon(Icons.gavel),
-            title: const Text('Impressum'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ImpressumScreen()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip),
-            title: const Text('Datenschutzerklärung'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PrivacyScreen()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.source),
-            title: const Text('Open-Source Lizenzen'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const LicensePage(
-                  applicationName: 'Conspa Diplomacy',
-                  applicationVersion: '1.0.0',
+          Text(loc.preferences, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.language),
+                  title: Text(loc.language),
+                  subtitle: Text(_selectedLanguage),
+                  onTap: _changeLanguage,
                 ),
-              ),
+                ListTile(
+                  leading: const Icon(Icons.link),
+                  title: const Text('Konto verknüpfen / Link Accounts'),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LinkAccountScreen()),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: Text(loc.logOut),
-            onTap: _logout,
+          const SizedBox(height: 24),
+          Text(loc.security, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.lock),
+                  title: const Text('End-to-End Encryption'),
+                  subtitle: Text('Public Key: $pubKeyPreview'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.refresh, color: errorColor),
+                  title: Text('Reset Key Pair', style: TextStyle(color: errorColor)),
+                  onTap: _isResetting ? null : _resetKey,
+                ),
+              ],
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            title: const Text('Konto löschen', style: TextStyle(color: Colors.red)),
-            onTap: _deleteAccount,
+          const SizedBox(height: 24),
+          Text(loc.about, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.group),
+                  title: Text(loc.joinTheCommunity),
+                  onTap: _launchCommunity,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info),
+                  title: Text(loc.appInfo),
+                  subtitle: Text(loc.version),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 24),
+          Text('Rechtliches', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.gavel),
+                  title: const Text('Impressum'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ImpressumScreen()),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip),
+                  title: const Text('Datenschutzerklärung'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.source),
+                  title: const Text('Open-Source Lizenzen'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const LicensePage(
+                        applicationName: 'Conspa Diplomacy',
+                        applicationVersion: '1.0.0',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: Text(loc.logOut),
+                  onTap: _logout,
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_forever, color: errorColor),
+                  title: Text('Konto löschen', style: TextStyle(color: errorColor)),
+                  onTap: _deleteAccount,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
         ],
       ),
     );

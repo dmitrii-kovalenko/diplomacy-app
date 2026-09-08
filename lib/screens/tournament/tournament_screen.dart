@@ -73,17 +73,17 @@ class _TournamentScreenState extends State<TournamentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text('Status: $status', style: const TextStyle(fontStyle: FontStyle.italic)),
+                Text('Status: $status', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic)),
                 const SizedBox(height: 16),
-                Text(description),
+                Text(description, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 16),
                 if (status == 'REGISTRATION' || status == 'Registration Open') ...[
                   if (isRegistered)
-                    const Chip(
-                      label: Text('Registered. Waiting for shuffle.', style: TextStyle(color: Colors.white)),
-                      backgroundColor: Colors.green,
+                    Chip(
+                      label: Text('Registered. Waiting for shuffle.', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                     )
                   else
                     ElevatedButton(
@@ -91,18 +91,18 @@ class _TournamentScreenState extends State<TournamentScreen> {
                       child: const Text('Register'),
                     ),
                 ] else if (isRegistered) ...[
-                  const Chip(
-                    label: Text('Registered', style: TextStyle(color: Colors.white)),
-                    backgroundColor: Colors.blue,
+                  Chip(
+                    label: Text('Registered', style: TextStyle(color: Theme.of(context).colorScheme.onSecondary)),
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
                   ),
                 ],
               ],
             ),
           ),
           const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Tournament Games', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text('Tournament Games', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           ),
           Expanded(
             child: ListView.builder(

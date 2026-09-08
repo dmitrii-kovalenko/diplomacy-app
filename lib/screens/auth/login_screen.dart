@@ -101,50 +101,68 @@ class _LoginScreenState extends State<LoginScreen> {
     final loc = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(title: Text(loc.login)),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(labelText: loc.email),
-              keyboardType: TextInputType.emailAddress,
+      body: Center(
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_isLoading) 
+                    const Center(child: CircularProgressIndicator())
+                  else ...[
+                    ElevatedButton(
+                      onPressed: _loginWithApple,
+                      child: Text(loc.signInWithApple),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _loginWithGoogle,
+                      child: Text(loc.signInWithGoogle),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      'OR',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(labelText: loc.email),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(labelText: loc.password),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _login,
+                      child: Text(loc.login),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                        );
+                      },
+                      child: Text(loc.createAnAccount),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(labelText: loc.password),
-              obscureText: true,
-            ),
-            const SizedBox(height: 20),
-            if (_isLoading) const CircularProgressIndicator()
-            else Column(
-              children: [
-                ElevatedButton(
-                  onPressed: _login,
-                  child: Text(loc.login),
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: _loginWithGoogle,
-                  child: Text(loc.signInWithGoogle),
-                ),
-                ElevatedButton(
-                  onPressed: _loginWithApple,
-                  child: Text(loc.signInWithApple),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                    );
-                  },
-                  child: Text(loc.createAnAccount),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
