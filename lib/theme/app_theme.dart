@@ -6,7 +6,7 @@
 //
 // The rules this file encodes, and why:
 //
-//  1. One accent, ever. Brass gold is the only interactive colour — links,
+//  1. One accent, ever. Patina teal is the only interactive colour — links,
 //     primary CTAs, selection, focus. Red/green/orange exist for *state*
 //     only, never for decoration.
 //  2. Depth comes from the surface, not from chrome. Elevation is a step up
@@ -169,10 +169,10 @@ class AppColors extends ThemeExtension<AppColors> {
     labelSecondary: Color(0x9EEBEBF5),
     labelTertiary: Color(0x52EBEBF5),
     labelQuaternary: Color(0x2EEBEBF5),
-    accent: Color(0xFFE3B457),
-    accentPressed: Color(0xFFC99B3E),
-    accentMuted: Color(0x24E3B457),
-    onAccent: Color(0xFF17120A),
+    accent: Color(0xFF7CDED8),
+    accentPressed: Color(0xFF4BD2C9),
+    accentMuted: Color(0x247CDED8),
+    onAccent: Color(0xFF0C1616),
     red: Color(0xFFFF453A),
     green: Color(0xFF30D158),
     orange: Color(0xFFFF9F0A),
@@ -193,9 +193,9 @@ class AppColors extends ThemeExtension<AppColors> {
     labelSecondary: Color(0x993C3C43),
     labelTertiary: Color(0x4D3C3C43),
     labelQuaternary: Color(0x2E3C3C43),
-    accent: Color(0xFF8A6316),
-    accentPressed: Color(0xFF6E4E10),
-    accentMuted: Color(0x1F8A6316),
+    accent: Color(0xFF1C5F5A),
+    accentPressed: Color(0xFF154744),
+    accentMuted: Color(0x1F1C5F5A),
     onAccent: Color(0xFFFFFFFF),
     red: Color(0xFFFF3B30),
     green: Color(0xFF34C759),
