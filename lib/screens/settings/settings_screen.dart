@@ -153,7 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final pub = _e2eeService.myPublicKeyBase64;
     final fingerprint = pub == null
         ? 'Not generated'
-        : (pub.length > 16 ? '${pub.substring(0, 16)}…' : pub);
+        : 'Active';
 
     return Scaffold(
       body: CustomScrollView(
