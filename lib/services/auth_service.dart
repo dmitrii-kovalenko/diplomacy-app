@@ -60,7 +60,7 @@ class AuthService {
     );
   }
   
-  Future<void> _saveTokens(Map<String, dynamic> data) async {
+  Future<void> saveTokens(Map<String, dynamic> data) async {
     if (data.containsKey('access')) {
       await storage.write(key: 'access_token', value: data['access']);
     }
@@ -74,7 +74,7 @@ class AuthService {
       'email': email,
       'password': password,
     });
-    await _saveTokens(response.data as Map<String, dynamic>);
+    await saveTokens(response.data as Map<String, dynamic>);
   }
 
   Future<void> register(String email, String password) async {
@@ -97,7 +97,7 @@ class AuthService {
       'id_token': credential.identityToken,
       'authorization_code': credential.authorizationCode,
     });
-    await _saveTokens(response.data as Map<String, dynamic>);
+    await saveTokens(response.data as Map<String, dynamic>);
   }
 
   Future<void> loginWithGoogle() async {
@@ -110,7 +110,7 @@ class AuthService {
       'id_token': googleAuth.idToken,
       'access_token': googleAuth.accessToken,
     });
-    await _saveTokens(response.data as Map<String, dynamic>);
+    await saveTokens(response.data as Map<String, dynamic>);
   }
 
   Future<void> setNickname(String nickname) async {

@@ -8,6 +8,7 @@ import '../../providers/locale_provider.dart';
 import '../legal/impressum_screen.dart';
 import '../legal/privacy_screen.dart';
 import '../auth/login_screen.dart';
+import 'link_account_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -156,6 +157,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text(loc.language),
             subtitle: Text(_selectedLanguage),
             onTap: _changeLanguage,
+          ),
+          ListTile(
+            leading: const Icon(Icons.link),
+            title: const Text('Konto verknüpfen / Link Accounts'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LinkAccountScreen()),
+              );
+            },
           ),
           const Divider(),
           Padding(padding: const EdgeInsets.all(16), child: Text(loc.security, style: const TextStyle(fontWeight: FontWeight.bold))),
