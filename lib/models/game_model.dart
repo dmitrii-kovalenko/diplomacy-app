@@ -7,6 +7,7 @@ class GameModel {
   final String? deadline;
   final bool isSandbox;
   final bool isPrivate;
+  final int status;
 
   GameModel({
     required this.id,
@@ -17,6 +18,7 @@ class GameModel {
     this.deadline,
     this.isSandbox = false,
     this.isPrivate = false,
+    this.status = 0,
   });
 
   factory GameModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class GameModel {
       deadline: json['deadline'],
       isSandbox: json['is_sandbox'] ?? false,
       isPrivate: json['is_private'] ?? false,
+      status: json['status'] ?? 0,
     );
   }
 }
