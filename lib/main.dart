@@ -178,18 +178,19 @@ class DiplomacyApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white24),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white12),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: colorAccent),
+            borderSide: const BorderSide(color: colorAccent, width: 2),
           ),
           filled: true,
           fillColor: colorSurface,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         useMaterial3: true,
       ),

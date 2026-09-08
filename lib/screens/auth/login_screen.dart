@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
@@ -114,14 +115,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (_isLoading) 
                     const Center(child: CircularProgressIndicator())
                   else ...[
-                    ElevatedButton(
+                    SignInWithAppleButton(
                       onPressed: _loginWithApple,
-                      child: Text(loc.signInWithApple),
+                      text: loc.signInWithApple,
+                      style: SignInWithAppleButtonStyle.whiteOutlined,
+                      borderRadius: const BorderRadius.all(Radius.circular(14)),
+                      height: 48,
                     ),
                     const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: _loginWithGoogle,
-                      child: Text(loc.signInWithGoogle),
+                    SizedBox(
+                      height: 48,
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _loginWithGoogle,
+                        icon: const Icon(Icons.g_mobiledata, size: 32, color: Colors.black),
+                        label: Text(
+                          loc.signInWithGoogle,
+                          style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 32),
                     Text(
@@ -144,9 +165,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: true,
                     ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _login,
-                      child: Text(loc.login),
+                    SizedBox(
+                      height: 48,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _login,
+                        child: Text(loc.login, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
