@@ -7,7 +7,7 @@ class AppConfig {
   // For production, override via --dart-define=BASE_URL=https://your-server.com
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
+    defaultValue: 'https://game.dmitrii-kovalenko.xyz',
   );
 
   // WebSocket base URL (derived from baseUrl)
