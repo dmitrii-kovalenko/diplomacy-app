@@ -36,10 +36,6 @@ bool _isGenerating = false;
   final E2EEService _e2eeService = E2EEService();
   
 
-  String? _generatedCode;
-  DateTime? _expiresAt;
-  Timer? _timer;
-  String _timeLeft = '';
 
   @override
   void initState() {
@@ -49,7 +45,6 @@ bool _isGenerating = false;
 
   @override
   void dispose() {
-    _timer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -57,17 +52,21 @@ bool _isGenerating = false;
   Future<void> _generateCode() async {
     setState(() {
       _isGenerating = true;
-      _generatedCode = null;
     });
     try {
       final res = await _authService.dio.post('/api/auth/link/generate/');
       final data = res.data;
+      
+      final keyStr = await _e2eeService.exportKey();
+      String fullCode = data['code'];
+      if (keyStr != null) {
+        fullCode += '-' + base64Encode(utf8.encode(keyStr));
+      }
+      
+      await Clipboard.setData(ClipboardData(text: fullCode));
+      
       if (!mounted) return;
-      setState(() {
-        _generatedCode = data['code'];
-        _expiresAt = DateTime.parse(data['expires_at']).toLocal();
-      });
-      _startTimer();
+      showToast(context, 'Code generated and copied to clipboard');
     } catch (e) {
       if (mounted) {
         showToast(context, 'Could not generate a code.', isError: true);
@@ -75,26 +74,6 @@ bool _isGenerating = false;
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_expiresAt == null) return;
-      final diff = _expiresAt!.difference(DateTime.now());
-      if (diff.isNegative) {
-        timer.cancel();
-        if (mounted) {
-          setState(() {
-            _timeLeft = 'Expired';
-            _generatedCode = null;
-          });
-        }
-      } else if (mounted) {
-        setState(() => _timeLeft =
-            '${diff.inMinutes}:${(diff.inSeconds % 60).toString().padLeft(2, '0')}');
-      }
-    });
   }
 
   Future<void> _mergeAccount() async {
@@ -190,70 +169,17 @@ bool _isGenerating = false;
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Generate a code here, then type it on your other device within the '
-          'countdown.',
+          'Generate a code here, then paste it on your other device.',
           style: t.bodyMedium?.copyWith(color: c.labelSecondary),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.xxl),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
-          decoration: BoxDecoration(
-            color: c.bgElevated,
-            borderRadius: AppRadius.brLg,
-            border: Border.all(color: c.separator, width: AppMetrics.hairline),
-          ),
-          child: Column(
-            children: [
-              if (_generatedCode != null) ...[
-                SelectableText(
-                  _generatedCode!,
-                  style: t.displayLarge?.copyWith(
-                    letterSpacing: 8,
-                    color: c.accent,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppButton(
-                  'Copy Code',
-                  style: AppButtonStyle.tinted,
-                  onPressed: () async {
-                    final keyStr = await _e2eeService.exportKey();
-                    String fullCode = _generatedCode!;
-                    if (keyStr != null) {
-                      fullCode += '-' + base64Encode(utf8.encode(keyStr));
-                    }
-                    await Clipboard.setData(ClipboardData(text: fullCode));
-                    if (mounted) showToast(context, 'Code copied to clipboard');
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                StatusPill(
-                  _timeLeft.isEmpty ? 'Valid' : 'Expires in $_timeLeft',
-                  tone: StatusTone.warning,
-                  icon: CupertinoIcons.clock,
-                ),
-              ] else ...[
-                Icon(CupertinoIcons.device_phone_portrait,
-                    size: 34, color: c.labelQuaternary),
-                const SizedBox(height: AppSpacing.md),
-                Text('No active code',
-                    style: t.bodyMedium?.copyWith(color: c.labelSecondary)),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
         AppButton(
-          _generatedCode == null ? 'Generate code' : 'Generate a new code',
-          style: _generatedCode == null
-              ? AppButtonStyle.filled
-              : AppButtonStyle.tinted,
+          'Generate & Copy Code',
+          style: AppButtonStyle.filled,
           loading: _isGenerating,
           onPressed: _generateCode,
         ),
-
       ],
     );
   }
