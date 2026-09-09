@@ -252,6 +252,182 @@ class _GameScreenState extends State<GameScreen> {
     return BoardState.unitPositionsAndColors(units);
   }
 
+  // `#RRGGBB` -> Color, or null for anything else (including the server's
+  // own null, sent for an observer or an empire with no colour assigned).
+  // `Empire.color` is a plain CharField with no validator, so a seven-character
+  // value is not necessarily seven hex digits; tryParse keeps a hand-edited
+  // colour from throwing out of build().
+  Color? _parseHexColor(String? hex) {
+    if (hex == null || !hex.startsWith('#') || hex.length != 7) return null;
+    final rgb = int.tryParse(hex.substring(1), radix: 16);
+    return rgb == null ? null : Color(0xFF000000 | rgb);
+  }
+
+  // Builds the live order-arrow overlay from `my_orders`, mirroring
+  // `arrows_overlay.js` `renderArrowsForOrders`/`renderOrder`: resolve every
+  // province code to a point, aggregate which routes already have a move
+  // order and which fleets convoy which route, then turn each raw order into
+  // an [Order] the painter can draw without knowing anything about codes.
+  // History-mode arrows are a separate ticket (T16), so this stays empty
+  // there rather than reaching into `_historyPhase`.
+  List<Order> _buildOrderArrows(
+    BuildContext context,
+    Map<String, Offset> unitPositions,
+    Map<String, ProvinceData>? mapData,
+  ) {
+    if (_isHistoryMode) return const [];
+    final rawOrders = _gameState?['my_orders'] as List? ?? [];
+    if (rawOrders.isEmpty) return const [];
+
+    final units = _gameState?['units'] as List<dynamic>? ?? [];
+    final labelPositions = _computeLabelPositions();
+    final meColor = _parseHexColor(_gameState?['me']?['color'] as String?);
+    final neutral = AppColors.of(context).labelTertiary;
+
+    // Same precedence as `arrows_overlay.js` `pt()`: unit centre (units move
+    // every turn, so this is the only source that can't go stale) → the
+    // admin-tunable label anchor + 16 (roughly the middle of the province,
+    // for a target with no unit on it) → the province's own bounds — the
+    // last-resort fallback for a sea province with neither.
+    Offset? pt(String? code) {
+      if (code == null) return null;
+      final unit = unitPositions[code];
+      if (unit != null) return unit;
+      final label = labelPositions[code];
+      if (label != null) return label.translate(0, 16);
+      final bounds = mapData?[code]?.path.getBounds();
+      if (bounds != null && !bounds.isEmpty) return bounds.center;
+      return null;
+    }
+
+    bool isMyUnit(String? code) {
+      if (code == null) return false;
+      for (final u in units) {
+        if (u['province_code'] == code) return u['is_mine'] == true;
+      }
+      return false;
+    }
+
+    Color colorFor(dynamic o) {
+      return _parseHexColor(o['color'] as String?) ?? meColor ?? neutral;
+    }
+
+    // Which routes already have a MOVE order (so a matching CONVOY order
+    // doesn't draw a second arrow on top of it), and which fleets convoy
+    // which route (so both the MOVE and a SUPPORT of that move can draw the
+    // arc through them instead of a straight line over the sea).
+    final hasMoveFor = <String>{};
+    final convoyFleetsByRoute = <String, List<String>>{};
+    for (final o in rawOrders) {
+      final type = (o['order_type'] as num?)?.toInt();
+      final auxCode = o['aux_code'] as String?;
+      final targetCode = o['target_code'] as String?;
+      final sourceCode = o['source_code'] as String?;
+      if (type == kOrderConvoy && auxCode != null && targetCode != null) {
+        (convoyFleetsByRoute['$auxCode->$targetCode'] ??= [])
+            .add(sourceCode ?? '');
+      } else if (type == kOrderMove && targetCode != null) {
+        hasMoveFor.add('$sourceCode->$targetCode');
+      }
+    }
+
+    List<Offset> fleetsFor(String? from, String? to) {
+      if (from == null || to == null) return const [];
+      final codes = convoyFleetsByRoute['$from->$to'];
+      if (codes == null) return const [];
+      return codes.map(pt).whereType<Offset>().toList();
+    }
+
+    final result = <Order>[];
+    for (final o in rawOrders) {
+      // One bad order must never blank the whole overlay.
+      try {
+        final rawType = (o['order_type'] as num?)?.toInt();
+        if (rawType != kOrderHold &&
+            rawType != kOrderMove &&
+            rawType != kOrderSupport &&
+            rawType != kOrderConvoy) {
+          continue; // Retreat/build/disband arrows aren't modelled yet.
+        }
+        final type = rawType!;
+        final source = pt(o['source_code'] as String?);
+        if (source == null) continue;
+        final color = colorFor(o);
+
+        if (type == kOrderConvoy) {
+          final auxCode = o['aux_code'] as String?;
+          final targetCode = o['target_code'] as String?;
+          if (auxCode == null || targetCode == null) continue;
+          // The convoyed army's own MOVE order already draws the
+          // through-ships arc; only draw this convoy order's own arc when
+          // that move isn't in this set (e.g. the fleet owner's own view,
+          // who can't see a foreign army's order).
+          if (hasMoveFor.contains('$auxCode->$targetCode')) continue;
+          final aux = pt(auxCode);
+          final target = pt(targetCode);
+          if (aux == null || target == null) continue;
+          result.add(Order(
+              orderType: type,
+              source: source,
+              target: target,
+              aux: aux,
+              color: color));
+          continue;
+        }
+
+        if (type == kOrderHold) {
+          result.add(Order(orderType: type, source: source, color: color));
+          continue;
+        }
+
+        if (type == kOrderMove) {
+          final targetCode = o['target_code'] as String?;
+          final target = pt(targetCode);
+          if (target == null) continue;
+          final fleets = fleetsFor(o['source_code'] as String?, targetCode);
+          result.add(Order(
+              orderType: type,
+              source: source,
+              target: target,
+              convoyFleets: fleets,
+              color: color));
+          continue;
+        }
+
+        // Support.
+        final auxCode = o['aux_code'] as String?;
+        final aux = pt(auxCode);
+        if (aux == null) continue;
+        final targetCode = o['target_code'] as String?;
+        if (targetCode == null || targetCode == auxCode) {
+          result.add(
+              Order(orderType: type, source: source, aux: aux, color: color));
+          continue;
+        }
+        final target = pt(targetCode);
+        if (target == null) continue;
+        final fleets = fleetsFor(auxCode, targetCode);
+        // "The move is missing" is only provable when every order of the
+        // supported unit is visible — for a live board that's my own units
+        // only, since a foreign unit's orders are secret until resolution.
+        final orphaned = !hasMoveFor.contains('$auxCode->$targetCode') &&
+            isMyUnit(auxCode);
+        result.add(Order(
+          orderType: type,
+          source: source,
+          target: target,
+          aux: aux,
+          convoyFleets: fleets,
+          color: color,
+          orphanedSupport: orphaned,
+        ));
+      } catch (e) {
+        debugPrint('order arrow build failed for $o: $e');
+      }
+    }
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
@@ -382,11 +558,16 @@ class _GameScreenState extends State<GameScreen> {
                 children: [
                   Consumer<OrderBloc>(
                     builder: (context, bloc, child) {
-                      // Order arrows are drawn from map-space coordinates the
-                      // viewer owns, so nothing is passed in from here yet.
-                      final List<Order> renderedOrders = [];
                       final (unitPositions, unitColors) =
                           _computeUnitPositionsAndColors();
+                      // Order arrows are drawn from the same map-space
+                      // coordinates the viewer owns — resolved here, from
+                      // `my_orders` plus whatever the viewer has already
+                      // parsed from the SVG (`bloc.mapData`), rather than in
+                      // MapViewer itself, which has no notion of a "unit
+                      // centre" or "province code" at all.
+                      final renderedOrders = _buildOrderArrows(
+                          context, unitPositions, bloc.mapData);
 
                       return MapViewer(
                         svgString: _svgString ?? '<svg></svg>',
