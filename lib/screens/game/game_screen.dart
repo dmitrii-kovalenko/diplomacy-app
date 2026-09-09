@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../blocs/game/order_bloc.dart';
+import '../../models/board_state.dart';
 import '../../services/game_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/map_viewer.dart';
@@ -219,93 +220,36 @@ class _GameScreenState extends State<GameScreen> {
     return '${p['year']} ${p['season_name']} · ${p['kind_name']}';
   }
 
+  // History rows carry only province_code/empire_code (no sc_x/sc_y, no
+  // is_supply_center) — empire colours still come from the live state's
+  // `empires` list, since the history payload doesn't repeat them either.
+  // See lib/models/board_state.dart for why this reads off the payload
+  // rather than the SVG, and for the copy GamePreviewScreen shares.
   Map<String, Color> _computeProvinceColors() {
     if (_gameState == null) return {};
-    // History rows carry only province_code/empire_code (no sc_x/sc_y, no
-    // is_supply_center) — empire colours still come from the live state's
-    // `empires` list, since the history payload doesn't repeat them either.
-    final scs =
-        (_historyPhase ?? _gameState)!['sc_ownership'] as List<dynamic>? ?? [];
-    final empires = _gameState!['empires'] as List<dynamic>? ?? [];
-    
-    final Map<String, Color> empireColors = {};
-    for (final e in empires) {
-      final code = e['code'] as String?;
-      final colorStr = e['color'] as String?;
-      if (code != null && colorStr != null) {
-        if (colorStr.startsWith('#') && colorStr.length == 7) {
-          final hex = colorStr.substring(1);
-          empireColors[code] = Color(int.parse('0xFF$hex')).withOpacity(0.55);
-        }
-      }
-    }
-
-    final Map<String, Color> colors = {};
-    for (final sc in scs) {
-      final prov = sc['province_code'] as String?;
-      final emp = sc['empire_code'] as String?;
-      if (prov != null && emp != null && empireColors.containsKey(emp)) {
-        colors[prov] = empireColors[emp]!;
-      }
-    }
-    return colors;
+    return BoardState.provinceColors(
+      scOwnership:
+          (_historyPhase ?? _gameState)!['sc_ownership'] as List<dynamic>? ??
+              [],
+      empires: _gameState!['empires'] as List<dynamic>? ?? [],
+    );
   }
 
-  // Province-code labels, sourced from the backend's `label_positions`
-  // ({code: [x, y]}) rather than the SVG's own baked-in <text> elements —
-  // these are admin-tunable per game_api/serializers.py, so the backend is
-  // authoritative. MapViewer never received this map at all before, which
-  // is why no labels ever appeared on the board.
-  //
   // Always read from `_gameState`, live or in history mode: labels are
   // static per map and the history payload carries none of its own.
   Map<String, Offset> _computeLabelPositions() {
-    final raw = _gameState?['label_positions'] as Map<String, dynamic>?;
-    if (raw == null) return {};
-    final positions = <String, Offset>{};
-    for (final entry in raw.entries) {
-      final xy = entry.value as List<dynamic>?;
-      if (xy != null && xy.length == 2) {
-        final x = (xy[0] as num?)?.toDouble();
-        final y = (xy[1] as num?)?.toDouble();
-        if (x != null && y != null) positions[entry.key] = Offset(x, y);
-      }
-    }
-    return positions;
+    return BoardState.labelPositions(
+      _gameState?['label_positions'] as Map<String, dynamic>?,
+    );
   }
 
-  // Where each unit token sits, and what colour it should be. Both come
-  // from the `units` list's own unit_x/unit_y/color fields, not from
-  // sc_ownership — a unit's position and its owner's colour are per-unit
-  // facts, unrelated to who (if anyone) holds the province as a supply
-  // center. MapViewer never received either map before, which — together
-  // with the missing label positions above — is why the board showed
-  // painted provinces but no borders' worth of context: no labels, no
-  // supply-center stars (a separate, now self-parsed fix), and no units.
-  //
   // TODO(T04 follow-up): the Mini App also overlays ownerless "Known World"
   // garrisons in history mode (assets/game/map.js liveNeutralOverlay) — this
   // client doesn't reconstruct that overlay yet.
   (Map<String, Offset>, Map<String, Color>) _computeUnitPositionsAndColors() {
-    // History unit rows have no `is_mine` and no `id`, but they do carry
-    // their own `color` per row (game/api/serializers.py
-    // _last_phase_payload), same as the live payload, so no extra lookup
-    // is needed to switch sources here.
-    final units = (_historyPhase ?? _gameState)?['units'] as List<dynamic>? ?? [];
-    final positions = <String, Offset>{};
-    final colors = <String, Color>{};
-    for (final u in units) {
-      final province = u['province_code'] as String?;
-      if (province == null) continue;
-      final x = (u['unit_x'] as num?)?.toDouble();
-      final y = (u['unit_y'] as num?)?.toDouble();
-      if (x != null && y != null) positions[province] = Offset(x, y);
-      final colorStr = u['color'] as String?;
-      if (colorStr != null && colorStr.startsWith('#') && colorStr.length == 7) {
-        colors[province] = Color(int.parse('0xFF${colorStr.substring(1)}'));
-      }
-    }
-    return (positions, colors);
+    final units =
+        (_historyPhase ?? _gameState)?['units'] as List<dynamic>? ?? [];
+    return BoardState.unitPositionsAndColors(units);
   }
 
   @override
