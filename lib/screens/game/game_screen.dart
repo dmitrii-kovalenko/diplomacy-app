@@ -36,8 +36,17 @@ class _GameScreenState extends State<GameScreen> {
   final GameService _gameService = GameService();
   bool _isLoading = true;
   bool _isReady = false;
-  int _historyOffset = 0;
-  bool _isHistoryMode = false;
+
+  // Offset convention matches the server's (game/api/games.py
+  // phase_history): 0 = most recent resolved phase, larger = further back.
+  // History mode is derived from whether a phase is loaded, not tracked as
+  // a separate flag that can drift from it. Stepping reads the offset the
+  // server actually served back from `_historyPhase['offset']` rather than
+  // a locally tracked counter, so a double-tap landing two responses out of
+  // order can't leave the client and server disagreeing about where it is.
+  Map<String, dynamic>? _historyPhase;
+  bool _isHistoryLoading = false;
+  bool get _isHistoryMode => _historyPhase != null;
 
   Map<String, dynamic>? _gameState;
   String? _svgString;
@@ -109,27 +118,42 @@ class _GameScreenState extends State<GameScreen> {
     _loadGame();
   }
 
+  // Loads the resolved phase at `offset` (0 = most recent) into
+  // `_historyPhase`, leaving `_gameState` — the live board — untouched.
+  // `_ensure_phase_snapshot` on the server can reconstruct a snapshot by
+  // replaying the game the first time an old phase is requested, so this
+  // shows the loader rather than leaving the board looking frozen.
   void _fetchHistory(int offset) async {
+    setState(() => _isHistoryLoading = true);
     try {
-      if (offset == 0) {
-        await _loadGame();
-        if (!mounted) return;
-        setState(() {
-          _historyOffset = 0;
-          _isHistoryMode = false;
-        });
+      final phase = await _gameService.fetchHistory(widget.gameId, offset);
+      if (!mounted) return;
+      if (phase == null) {
+        // games.py returns {"phase": null} once offset runs past the last
+        // resolved phase — most commonly there simply isn't one yet. Leaving
+        // `_historyPhase` alone (rather than assigning null over a phase
+        // already on screen) would make "View history" look like it did
+        // nothing at all, so say so explicitly.
+        setState(() => _isHistoryLoading = false);
+        showToast(context, 'No resolved turns yet.');
         return;
       }
-      final data = await _gameService.fetchHistory(widget.gameId, offset);
-      if (!mounted) return;
       setState(() {
-        _gameState = data;
-        _historyOffset = offset;
-        _isHistoryMode = offset < 0;
+        _historyPhase = phase;
+        _isHistoryLoading = false;
       });
     } catch (e) {
-      if (mounted) showToast(context, 'History error: $e', isError: true);
+      if (!mounted) return;
+      setState(() => _isHistoryLoading = false);
+      showToast(context, 'History error: $e', isError: true);
     }
+  }
+
+  void _exitHistory() {
+    setState(() {
+      _historyPhase = null;
+    });
+    _loadGame();
   }
 
   void _showBuildSheet(BuildContext context, OrderBloc bloc) {
@@ -186,9 +210,22 @@ class _GameScreenState extends State<GameScreen> {
     return parts.isEmpty ? 'Game ${widget.gameId}' : parts.join(' · ');
   }
 
+  // Mirrors the Mini App's renderHistoryBar label (assets/game/orders_ui.js:
+  // `${p.year} ${p.season_name} · ${p.kind_name}`) instead of a raw offset
+  // count, which used to render as the nonsensical "-1 turns back".
+  String get _historySubtitle {
+    final p = _historyPhase;
+    if (p == null) return '';
+    return '${p['year']} ${p['season_name']} · ${p['kind_name']}';
+  }
+
   Map<String, Color> _computeProvinceColors() {
     if (_gameState == null) return {};
-    final scs = _gameState!['sc_ownership'] as List<dynamic>? ?? [];
+    // History rows carry only province_code/empire_code (no sc_x/sc_y, no
+    // is_supply_center) — empire colours still come from the live state's
+    // `empires` list, since the history payload doesn't repeat them either.
+    final scs =
+        (_historyPhase ?? _gameState)!['sc_ownership'] as List<dynamic>? ?? [];
     final empires = _gameState!['empires'] as List<dynamic>? ?? [];
     
     final Map<String, Color> empireColors = {};
@@ -219,6 +256,9 @@ class _GameScreenState extends State<GameScreen> {
   // these are admin-tunable per game_api/serializers.py, so the backend is
   // authoritative. MapViewer never received this map at all before, which
   // is why no labels ever appeared on the board.
+  //
+  // Always read from `_gameState`, live or in history mode: labels are
+  // static per map and the history payload carries none of its own.
   Map<String, Offset> _computeLabelPositions() {
     final raw = _gameState?['label_positions'] as Map<String, dynamic>?;
     if (raw == null) return {};
@@ -242,8 +282,16 @@ class _GameScreenState extends State<GameScreen> {
   // with the missing label positions above — is why the board showed
   // painted provinces but no borders' worth of context: no labels, no
   // supply-center stars (a separate, now self-parsed fix), and no units.
+  //
+  // TODO(T04 follow-up): the Mini App also overlays ownerless "Known World"
+  // garrisons in history mode (assets/game/map.js liveNeutralOverlay) — this
+  // client doesn't reconstruct that overlay yet.
   (Map<String, Offset>, Map<String, Color>) _computeUnitPositionsAndColors() {
-    final units = _gameState?['units'] as List<dynamic>? ?? [];
+    // History unit rows have no `is_mine` and no `id`, but they do carry
+    // their own `color` per row (game/api/serializers.py
+    // _last_phase_payload), same as the live payload, so no extra lookup
+    // is needed to switch sources here.
+    final units = (_historyPhase ?? _gameState)?['units'] as List<dynamic>? ?? [];
     final positions = <String, Offset>{};
     final colors = <String, Color>{};
     for (final u in units) {
@@ -277,8 +325,14 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     return ChangeNotifierProvider(
-      create: (context) {
-        final bloc = OrderBloc(widget.gameId, onOrderSubmitted: _loadGame);
+      create: (_) {
+        final bloc = OrderBloc(
+          widget.gameId,
+          onOrderSubmitted: _loadGame,
+          onOrderError: (message) {
+            if (mounted) showToast(context, message, isError: true);
+          },
+        );
         bloc.setGameState(_gameState!);
         return bloc;
       },
@@ -293,7 +347,7 @@ class _GameScreenState extends State<GameScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
               if (_isHistoryMode)
-                Text('$_historyOffset turns back',
+                Text(_historySubtitle,
                     style: t.labelSmall?.copyWith(color: c.labelSecondary)),
             ],
           ),
@@ -302,17 +356,23 @@ class _GameScreenState extends State<GameScreen> {
                   IconButton(
                     icon: const Icon(CupertinoIcons.chevron_left),
                     tooltip: 'Earlier turn',
-                    onPressed: () => _fetchHistory(_historyOffset - 1),
+                    onPressed: _historyPhase?['has_prev'] == true
+                        ? () => _fetchHistory(
+                            (_historyPhase!['offset'] as num).toInt() + 1)
+                        : null,
                   ),
                   IconButton(
                     icon: const Icon(CupertinoIcons.chevron_right),
                     tooltip: 'Later turn',
-                    onPressed: () => _fetchHistory(_historyOffset + 1),
+                    onPressed: _historyPhase?['has_next'] == true
+                        ? () => _fetchHistory(
+                            (_historyPhase!['offset'] as num).toInt() - 1)
+                        : null,
                   ),
                   IconButton(
                     icon: const Icon(CupertinoIcons.xmark),
                     tooltip: 'Back to the live board',
-                    onPressed: () => _fetchHistory(0),
+                    onPressed: _exitHistory,
                   ),
                   const SizedBox(width: AppSpacing.xs),
                 ]
@@ -341,7 +401,7 @@ class _GameScreenState extends State<GameScreen> {
                     onSelected: (val) {
                       if (val == 'draw') _proposeDraw();
                       if (val == 'surrender') _surrender();
-                      if (val == 'history') _fetchHistory(-1);
+                      if (val == 'history') _fetchHistory(0);
                     },
                     itemBuilder: (_) => [
                       const PopupMenuItem(
@@ -368,62 +428,85 @@ class _GameScreenState extends State<GameScreen> {
                 onReject: () => _voteDraw(false),
               ),
             Expanded(
-              child: Consumer<OrderBloc>(
-                builder: (context, bloc, child) {
-                  // Order arrows are drawn from map-space coordinates the
-                  // viewer owns, so nothing is passed in from here yet.
-                  final List<Order> renderedOrders = [];
-                  final (unitPositions, unitColors) =
-                      _computeUnitPositionsAndColors();
+              // MapViewer owns a TransformationController that must survive a
+              // history step, so the loader is overlaid in a Stack instead of
+              // replacing this subtree — swapping it in via a ternary would
+              // unmount MapViewer, disposing that controller and re-running
+              // _parseSvg on the way back, which throws away the player's
+              // zoom/pan on every "earlier turn" / "later turn" tap.
+              child: Stack(
+                children: [
+                  Consumer<OrderBloc>(
+                    builder: (context, bloc, child) {
+                      // Order arrows are drawn from map-space coordinates the
+                      // viewer owns, so nothing is passed in from here yet.
+                      final List<Order> renderedOrders = [];
+                      final (unitPositions, unitColors) =
+                          _computeUnitPositionsAndColors();
 
-                  return MapViewer(
-                    svgString: _svgString ?? '<svg></svg>',
-                    provinceColors: _computeProvinceColors(),
-                    labelPositions: _computeLabelPositions(),
-                    unitPositions: unitPositions,
-                    unitColors: unitColors,
-                    onSvgParsed: (mapData) {
-                      bloc.setMapData(mapData);
-                    },
-                    onProvinceTapped: (province) {
-                      if (_isHistoryMode) return;
-                      bool hasUnit = false;
-                      bool isOwned = false;
-                      bool isOwnedSc = false;
+                      return MapViewer(
+                        svgString: _svgString ?? '<svg></svg>',
+                        provinceColors: _computeProvinceColors(),
+                        labelPositions: _computeLabelPositions(),
+                        unitPositions: unitPositions,
+                        unitColors: unitColors,
+                        onSvgParsed: (mapData) {
+                          bloc.setMapData(mapData);
+                        },
+                        onProvinceTapped: (province) {
+                          if (_isHistoryMode) return;
+                          bool hasUnit = false;
+                          bool isOwned = false;
+                          bool isOwnedSc = false;
 
-                      final myCode = _gameState?['me']['empire_code'];
+                          final myCode = _gameState?['me']['empire_code'];
 
-                      if (_gameState?['units'] != null) {
-                        for (var u in _gameState!['units']) {
-                          if (u['province_code'] == province) {
-                            hasUnit = true;
-                            if (u['empire_code'] == myCode) isOwned = true;
-                            break;
+                          if (_gameState?['units'] != null) {
+                            for (var u in _gameState!['units']) {
+                              if (u['province_code'] == province) {
+                                hasUnit = true;
+                                if (u['empire_code'] == myCode) isOwned = true;
+                                break;
+                              }
+                            }
                           }
-                        }
-                      }
 
-                      if (_gameState?['sc_ownership'] != null) {
-                        for (var sc in _gameState!['sc_ownership']) {
-                          if (sc['province_code'] == province &&
-                              sc['empire_code'] == myCode) {
-                            isOwnedSc = true;
-                            break;
+                          if (_gameState?['sc_ownership'] != null) {
+                            for (var sc in _gameState!['sc_ownership']) {
+                              if (sc['province_code'] == province &&
+                                  sc['empire_code'] == myCode) {
+                                isOwnedSc = true;
+                                break;
+                              }
+                            }
                           }
-                        }
-                      }
 
-                      final phaseKind =
-                          _gameState?['phase']?['kind'] ?? 'diplomacy';
+                          final phaseKind =
+                              (_gameState?['phase']?['kind'] as num?)
+                                      ?.toInt() ??
+                                  kPhaseMovement;
 
-                      bloc.selectProvince(
-                          province, hasUnit, isOwned, phaseKind, isOwnedSc);
+                          bloc.selectProvince(province, hasUnit, isOwned,
+                              phaseKind, isOwnedSc);
+                        },
+                        activeOrderUnitProvince: bloc.selectedProvince,
+                        validTargetProvinces: bloc.validTargetProvinces,
+                        orders: renderedOrders,
+                      );
                     },
-                    activeOrderUnitProvince: bloc.selectedProvince,
-                    validTargetProvinces: bloc.validTargetProvinces,
-                    orders: renderedOrders,
-                  );
-                },
+                  ),
+                  if (_isHistoryLoading)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: ColoredBox(
+                          color: c.scrim,
+                          child: const Center(
+                            child: AppLoader(label: 'Loading history…'),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             if (!_isHistoryMode)

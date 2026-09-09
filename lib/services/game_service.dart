@@ -5,7 +5,17 @@ class GameService {
   final Dio dio = AuthService().dio;
 
   Future<void> submitOrder(String gameId, Map<String, dynamic> data) async {
-    await dio.post('/api/games/$gameId/orders/', data: data);
+    try {
+      await dio.post('/api/games/$gameId/orders/', data: data);
+    } on DioException catch (e) {
+      // Surface the server's own message (game/api/orders.py returns
+      // {"error": "..."} on both validation failures and the blanket
+      // exception handler) rather than letting a raw DioException reach the
+      // caller, so OrderBloc has something worth putting in a toast.
+      final body = e.response?.data;
+      final serverMessage = body is Map ? body['error']?.toString() : null;
+      throw Exception(serverMessage ?? 'Could not submit the order.');
+    }
   }
 
   Future<void> cancelOrder(String orderId) async {
@@ -23,9 +33,13 @@ class GameService {
     await dio.post('/api/games/$gameId/surrender/');
   }
 
-  Future<Map<String, dynamic>> fetchHistory(String gameId, int offset) async {
+  // The endpoint wraps the phase in an envelope ({"phase": {...} | null}) —
+  // unwrap it here so callers get the phase itself, matching what the Mini
+  // App's `r.phase` does (assets/game/orders_ui.js loadHistoryPhase).
+  Future<Map<String, dynamic>?> fetchHistory(String gameId, int offset) async {
     final response = await dio.get('/api/games/$gameId/history/', queryParameters: {'offset': offset});
-    return response.data as Map<String, dynamic>;
+    final data = response.data as Map<String, dynamic>;
+    return data['phase'] as Map<String, dynamic>?;
   }
 
   Future<Map<String, dynamic>> fetchGameState(String gameId) async {

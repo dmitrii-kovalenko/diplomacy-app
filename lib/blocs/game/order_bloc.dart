@@ -5,24 +5,44 @@ import '../../widgets/map_viewer.dart';
 enum OrderState { idle, unitSelected, actionChosen, targetSelection, auxTargetSelection }
 enum ActionType { hold, move, support, convoy, buildArmy, buildFleet, disband }
 
+// Numeric codes mirroring DjangoProject/game/choices.py — the API sends and
+// expects these ints on the wire, never the display strings this bloc used
+// to compare against. Keep this block in sync with choices.py by hand; there
+// is no shared codegen between the two repos.
+const int kPhaseMovement = 0;
+const int kPhaseRetreat = 1;
+const int kPhaseAdjustment = 2;
+
+const int kUnitArmy = 0;
+const int kUnitFleet = 1;
+
+const int kOrderHold = 0;
+const int kOrderMove = 1;
+const int kOrderSupport = 2;
+const int kOrderConvoy = 3;
+const int kOrderRetreat = 4;
+const int kOrderBuild = 5;
+const int kOrderDisband = 6;
+
 class OrderBloc extends ChangeNotifier {
   final String gameId;
   final GameService _gameService = GameService();
 
   OrderState currentState = OrderState.idle;
-  
+
   String? selectedProvince;
   ActionType? chosenAction;
   String? targetProvince;
   String? auxTargetProvince;
-  String? selectedUnitType; // 'A' or 'F'
+  int? selectedUnitType; // kUnitArmy or kUnitFleet
 
   Set<String> validTargetProvinces = {};
   Map<String, ProvinceData>? mapData;
   Map<String, dynamic>? gameState; // To read current unit states if needed
   final VoidCallback? onOrderSubmitted;
+  final void Function(String message)? onOrderError;
 
-  OrderBloc(this.gameId, {this.onOrderSubmitted});
+  OrderBloc(this.gameId, {this.onOrderSubmitted, this.onOrderError});
 
   void setMapData(Map<String, ProvinceData> data) {
     mapData = data;
@@ -43,9 +63,9 @@ class OrderBloc extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectProvince(String province, bool hasUnit, bool isOwned, String phase, bool isOwnedSc) {
+  void selectProvince(String province, bool hasUnit, bool isOwned, int phaseKind, bool isOwnedSc) {
     if (currentState == OrderState.idle) {
-      if (phase == 'adjustment') {
+      if (phaseKind == kPhaseAdjustment) {
         if (hasUnit && isOwned) {
           // Disband flow
           selectedProvince = province;
@@ -60,13 +80,15 @@ class OrderBloc extends ChangeNotifier {
       } else {
         if (hasUnit) {
           selectedProvince = province;
-          
-          // Try to deduce unit type from gameState
-          selectedUnitType = 'A';
+
+          // Try to deduce unit type from gameState, defaulting to army when
+          // the field is missing or arrives as something unexpected.
+          selectedUnitType = kUnitArmy;
           if (gameState != null && gameState!['units'] != null) {
             for (var u in gameState!['units']) {
               if (u['province_code'] == province) {
-                selectedUnitType = u['unit_type'];
+                selectedUnitType =
+                    (u['unit_type'] as num?)?.toInt() ?? kUnitArmy;
                 break;
               }
             }
@@ -117,16 +139,22 @@ class OrderBloc extends ChangeNotifier {
 
     // Simple reachability: adjacencies from SVG.
     // Real logic handles convoy chains and strict coasts.
+    //
+    // The SVG's data-type is one of sea | inland | coast | archipelago
+    // (verified across all ten maps) — there is no plain "land" value, so an
+    // army's target test is "not sea" rather than an enumerated land list.
     for (final adj in provinceData.adjacencies) {
       final adjData = mapData![adj];
       if (adjData == null) continue;
 
-      if (selectedUnitType == 'A') {
+      if (selectedUnitType == kUnitArmy) {
         if (adjData.type != 'sea') {
           validTargetProvinces.add(adj);
         }
-      } else if (selectedUnitType == 'F') {
-        if (adjData.type == 'sea' || adjData.type == 'coast') {
+      } else if (selectedUnitType == kUnitFleet) {
+        if (adjData.type == 'sea' ||
+            adjData.type == 'coast' ||
+            adjData.type == 'archipelago') {
           validTargetProvinces.add(adj);
         }
       }
@@ -139,30 +167,44 @@ class OrderBloc extends ChangeNotifier {
 
   Future<void> submitOrder() async {
     if (selectedProvince == null || chosenAction == null) return;
-    
-    String actionStr = 'HOLD';
-    if (chosenAction == ActionType.move) actionStr = 'MOVE';
-    if (chosenAction == ActionType.support) actionStr = 'SUPPORT';
-    if (chosenAction == ActionType.convoy) actionStr = 'CONVOY';
-    if (chosenAction == ActionType.buildArmy) actionStr = 'BUILD';
-    if (chosenAction == ActionType.buildFleet) actionStr = 'BUILD';
-    if (chosenAction == ActionType.disband) actionStr = 'DISBAND';
 
-    String unitTypeStr = selectedUnitType ?? 'A';
-    if (chosenAction == ActionType.buildArmy) unitTypeStr = 'A';
-    if (chosenAction == ActionType.buildFleet) unitTypeStr = 'F';
+    int orderType = kOrderHold;
+    if (chosenAction == ActionType.move) orderType = kOrderMove;
+    if (chosenAction == ActionType.support) orderType = kOrderSupport;
+    if (chosenAction == ActionType.convoy) orderType = kOrderConvoy;
+    if (chosenAction == ActionType.buildArmy) orderType = kOrderBuild;
+    if (chosenAction == ActionType.buildFleet) orderType = kOrderBuild;
+    if (chosenAction == ActionType.disband) orderType = kOrderDisband;
+
+    int unitType = selectedUnitType ?? kUnitArmy;
+    if (chosenAction == ActionType.buildArmy) unitType = kUnitArmy;
+    if (chosenAction == ActionType.buildFleet) unitType = kUnitFleet;
+
+    // A build never goes through targetSelection — setAction submits it the
+    // moment the unit type is chosen — so targetProvince is always null here.
+    // The Mini App's submitBuild names the SC being built in as both source
+    // and target (orders_ui.js), and validation.py rejects a build with no
+    // target_province_id, so mirror that instead of sending null.
+    final bool isBuild = chosenAction == ActionType.buildArmy ||
+        chosenAction == ActionType.buildFleet;
+    final String? target = isBuild ? selectedProvince : targetProvince;
 
     try {
       await _gameService.submitOrder(gameId, {
         'source': selectedProvince,
-        'order_type': actionStr,
-        'target': targetProvince,
+        'order_type': orderType,
+        'target': target,
         'aux': auxTargetProvince,
-        'unit_type': unitTypeStr,
+        'unit_type': unitType,
+        // Matches the Mini App's payload shape (assets/game/orders_ui.js
+        // submitOrder/submitBuild) even though coast selection itself is
+        // out of scope here — the server reads this key unconditionally.
+        'target_coast': '',
       });
       onOrderSubmitted?.call();
     } catch (e) {
       debugPrint('Order submission failed: $e');
+      onOrderError?.call(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       reset();
     }
