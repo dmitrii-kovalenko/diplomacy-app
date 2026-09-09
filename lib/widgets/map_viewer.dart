@@ -10,16 +10,24 @@ class ProvinceData {
   final List<String> adjacencies;
   final Path path;
 
-  ProvinceData({required this.id, required this.type, required this.adjacencies, required this.path});
+  /// The province path's `class` attribute (`land` | `sea` | `island`), i.e.
+  /// the cartography the SVG's own `<style>` block paints it with. Distinct
+  /// from [type], which is the gameplay classification (`data-type`) used for
+  /// move validation — a coastal province is `type: coast` but `cssClass:
+  /// land`.
+  final String cssClass;
+
+  ProvinceData({required this.id, required this.type, required this.adjacencies, required this.path, required this.cssClass});
 }
 
-/// One shape from the SVG's `<g id="neutral">` layer: the base cartography
-/// (parchment land, sea, decorative unclickable coastline) that every map
-/// ships alongside the interactive `<g id="provinces">` layer. The web
-/// client renders the whole SVG natively and gets this for free; this
-/// painter has to draw it explicitly or the shapes that exist ONLY in this
-/// layer (e.g. small islands with no gameplay role) never appear at all —
-/// the app's own background shows through in exactly their silhouette.
+/// One shape from the SVG's root-level `<rect>` sea backdrop or its
+/// `<g id="neutral">` layer: the base cartography (parchment land, sea,
+/// decorative unclickable coastline) that every map ships alongside the
+/// interactive `<g id="provinces">` layer. The web client renders the whole
+/// SVG natively and gets this for free; this painter has to draw it
+/// explicitly or the shapes that exist ONLY here (e.g. small islands with no
+/// gameplay role, or the ocean itself) never appear at all — the app's own
+/// background shows through in exactly their silhouette.
 class NeutralShape {
   final Path path;
   final Color fill;
@@ -29,12 +37,15 @@ class NeutralShape {
   NeutralShape(this.path, this.fill, this.stroke, this.strokeWidth);
 }
 
-/// Fill/stroke/width for each class used in `<g id="neutral">`, copied from
-/// the `<style>` block every shipped map SVG defines identically. A class
-/// this table doesn't recognise falls back to the "land" look rather than
-/// disappearing.
+/// Fill/stroke/width for each class used in `<g id="neutral">`, the root
+/// `<rect>` backdrop and `<g id="provinces">`, copied from the `<style>`
+/// block every shipped map SVG defines identically. This mirrors the SVG's
+/// own cartography, not the app's UI — it deliberately does not live in
+/// `AppColors`. A class this table doesn't recognise falls back to the
+/// "land" look rather than disappearing.
 const Map<String, (Color, Color, double)> _neutralStyles = {
   'land': (Color(0xFFE8DFC0), Color(0xFF999999), 0.7),
+  'island': (Color(0xFFE8DFC0), Color(0xFF999999), 0.7),
   'sea': (Color(0xFFADC8E0), Color(0xFF5A8FAA), 0.5),
   'unclickable': (Color(0xFFCFC6A8), Color(0xFF8A8267), 0.7),
 };
@@ -80,6 +91,7 @@ class MapViewer extends StatefulWidget {
 
 class _MapViewerState extends State<MapViewer> {
   final Map<String, Path> _paths = {};
+  final Map<String, String> _provinceClasses = {};
   final List<NeutralShape> _neutralShapes = [];
   // Supply-center marker positions. These are static per map (they don't
   // move turn to turn) and the SVG already carries them in
@@ -90,6 +102,29 @@ class _MapViewerState extends State<MapViewer> {
   // never appeared).
   final Map<String, Offset> _svgScPositions = {};
   Size _mapSize = const Size(1000, 1000); // Default, updated on parse
+
+  // Bumped every time `_parseSvg` successfully replaces the parsed data.
+  // `_paths` and friends are mutated in place, so comparing map identity in
+  // `shouldRepaint` is always false; this counter is what actually changes.
+  int _parseGeneration = 0;
+
+  final TransformationController _transformController = TransformationController();
+  // The map size the current transform was homed for. Re-homing (writing
+  // `_transformController.value`) only happens when THIS changes — never on
+  // a viewport-only change, or every `AnimatedSize` tick of the command bar
+  // (it has 38/40/72px variants and disappears entirely in history mode)
+  // would yank a panned/zoomed player back to the fitted view.
+  Size? _homedMapSize;
+  // The last viewport `_homeScale` (and so `_boundaryMargin`) was computed
+  // for, kept only to skip redundant recomputation on an unchanged rebuild.
+  Size? _lastViewportSize;
+  double _homeScale = 0.5;
+  // Generous enough that the board can be panned to its edge and back
+  // without the clamp fighting the home centring, but not so generous that
+  // the whole board can be dragged past the edge of the viewport and left
+  // on a blank screen with no way back (T02 rules out a "reset view"
+  // button). Recomputed alongside `_homeScale` in `_homeTransform`.
+  EdgeInsets _boundaryMargin = EdgeInsets.zero;
 
   @override
   void initState() {
@@ -109,16 +144,28 @@ class _MapViewerState extends State<MapViewer> {
     }
   }
 
+  @override
+  void dispose() {
+    _transformController.dispose();
+    super.dispose();
+  }
+
   Future<void> _parseSvg() async {
-    _paths.clear();
-    _neutralShapes.clear();
-    _svgScPositions.clear();
-    final Map<String, ProvinceData> provinceDataMap = {};
-    
-    // Yield to let page transition finish before heavy parsing
+    // Yield to let page transition finish before heavy parsing. Everything
+    // below is built into local collections and only written to the state
+    // fields once parsing has fully succeeded, so a frame drawn while this
+    // is in flight keeps painting the previous (or still-empty) board
+    // instead of a half-cleared one.
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
-    
+
+    final paths = <String, Path>{};
+    final provinceClasses = <String, String>{};
+    final neutralShapes = <NeutralShape>[];
+    final svgScPositions = <String, Offset>{};
+    final provinceDataMap = <String, ProvinceData>{};
+    var mapSize = _mapSize;
+
     try {
       final document = XmlDocument.parse(widget.svgString);
       final svgElement = document.findAllElements('svg').firstOrNull;
@@ -126,15 +173,32 @@ class _MapViewerState extends State<MapViewer> {
         final widthStr = svgElement.getAttribute('width')?.replaceAll('px', '');
         final heightStr = svgElement.getAttribute('height')?.replaceAll('px', '');
         if (widthStr != null && heightStr != null) {
-          _mapSize = Size(double.parse(widthStr), double.parse(heightStr));
+          mapSize = Size(double.parse(widthStr), double.parse(heightStr));
         } else {
           final viewBox = svgElement.getAttribute('viewBox');
           if (viewBox != null) {
             final parts = viewBox.split(' ');
             if (parts.length >= 4) {
-              _mapSize = Size(double.parse(parts[2]), double.parse(parts[3]));
+              mapSize = Size(double.parse(parts[2]), double.parse(parts[3]));
             }
           }
+        }
+
+        // The ocean backdrop. Every shipped map draws it as a `<rect>` that
+        // is a direct child of `<svg>` — outside `g#neutral` and outside
+        // `g#provinces` — so it must be read here, not from the province
+        // parser below. It has to be painted before everything else or it
+        // covers the whole board. Each `<rect>`'s own `clip-path` is a
+        // full-size rect on every shipped map, so ignoring `clip-path` here
+        // is currently a no-op, not a shortcut that loses anything.
+        for (final element in svgElement.childElements.where((e) => e.name.local == 'rect')) {
+          final x = double.tryParse(element.getAttribute('x') ?? '') ?? 0;
+          final y = double.tryParse(element.getAttribute('y') ?? '') ?? 0;
+          final w = double.tryParse(element.getAttribute('width') ?? '');
+          final h = double.tryParse(element.getAttribute('height') ?? '');
+          if (w == null || h == null) continue;
+          final style = _neutralStyles[element.getAttribute('class')] ?? _neutralStyles['sea']!;
+          neutralShapes.add(NeutralShape(Path()..addRect(Rect.fromLTWH(x, y, w, h)), style.$1, style.$2, style.$3));
         }
       }
 
@@ -158,7 +222,7 @@ class _MapViewerState extends State<MapViewer> {
               : ((element.getAttribute('style') ?? '').contains('fill:url(')
                   ? _neutralStyles['sea']!
                   : _neutralStyles['land']!);
-          _neutralShapes.add(NeutralShape(path, style.$1, style.$2, style.$3));
+          neutralShapes.add(NeutralShape(path, style.$1, style.$2, style.$3));
         }
       }
 
@@ -175,7 +239,7 @@ class _MapViewerState extends State<MapViewer> {
           final title = circle.findElements('title').firstOrNull?.innerText.trim();
           final code = title?.split(RegExp(r'\s+')).firstOrNull;
           if (code != null && code.isNotEmpty) {
-            _svgScPositions[code] = Offset(cx, cy);
+            svgScPositions[code] = Offset(cx, cy);
           }
         }
       }
@@ -187,25 +251,44 @@ class _MapViewerState extends State<MapViewer> {
         final d = element.getAttribute('d');
         if (id != null && d != null) {
           final path = parseSvgPathData(d);
-          _paths[id] = path;
-          
+          paths[id] = path;
+
           final type = element.getAttribute('data-type') ?? 'land';
+          final cssClass = element.getAttribute('class') ?? 'land';
+          provinceClasses[id] = cssClass;
           final adjStr = element.getAttribute('data-adj') ?? '';
           final adjacencies = adjStr.isNotEmpty ? adjStr.split(' ') : <String>[];
-          provinceDataMap[id] = ProvinceData(id: id, type: type, adjacencies: adjacencies, path: path);
+          provinceDataMap[id] = ProvinceData(id: id, type: type, adjacencies: adjacencies, path: path, cssClass: cssClass);
         }
-      }
-      
-      if (widget.onSvgParsed != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          widget.onSvgParsed!(provinceDataMap);
-        });
       }
     } catch (e) {
       debugPrint('Error parsing SVG: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('SVG ERROR: $e')));
       }
+      return;
+    }
+
+    if (!mounted) return;
+    _paths
+      ..clear()
+      ..addAll(paths);
+    _provinceClasses
+      ..clear()
+      ..addAll(provinceClasses);
+    _neutralShapes
+      ..clear()
+      ..addAll(neutralShapes);
+    _svgScPositions
+      ..clear()
+      ..addAll(svgScPositions);
+    _mapSize = mapSize;
+    _parseGeneration++;
+
+    if (widget.onSvgParsed != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onSvgParsed!(provinceDataMap);
+      });
     }
   }
 
@@ -219,38 +302,99 @@ class _MapViewerState extends State<MapViewer> {
     }
   }
 
+  /// Fits `_mapSize` inside `viewportSize` ("contain": the whole board is
+  /// always visible, letterboxed on whichever axis has slack) and centres
+  /// it — but only actually writes `_transformController.value` (re-homing,
+  /// discarding the player's pan/zoom) when the *map* has changed. A
+  /// viewport-only change (the command bar's `AnimatedSize`, the draw
+  /// banner, history mode removing the bar entirely) still needs a fresh
+  /// `_homeScale`/`_boundaryMargin` — the scale bounds and pan clamp must
+  /// track the new available space — but must leave the transform alone.
+  /// Cheap to call every build — it does nothing once already up to date —
+  /// so it is safe to call unconditionally from `LayoutBuilder`.
+  void _homeTransform(Size viewportSize) {
+    if (viewportSize.isEmpty || _mapSize.isEmpty) return;
+    final mapChanged = _homedMapSize != _mapSize;
+    if (!mapChanged && _lastViewportSize == viewportSize) return;
+    _lastViewportSize = viewportSize;
+
+    _homeScale = (viewportSize.width / _mapSize.width) < (viewportSize.height / _mapSize.height)
+        ? viewportSize.width / _mapSize.width
+        : viewportSize.height / _mapSize.height;
+
+    // The boundary is expressed in child (map) coordinates. It needs to
+    // cover the letterbox slack on whichever axis has it (half the gap
+    // between the scaled map and the viewport on that axis), or the home
+    // position itself would be outside the clamp and get fought on the
+    // very first frame. On top of that, allow roughly another half-viewport
+    // of pan past the map's edge on each side — generous enough that
+    // panning to an edge and back never feels clamped, but tight enough
+    // that some of the board always stays on screen; a boundary as wide as
+    // the whole map (the previous behaviour) let the board be dragged
+    // completely off-screen with no "reset view" button to recover with.
+    final letterboxX = (viewportSize.width / _homeScale - _mapSize.width).clamp(0, double.infinity) / 2;
+    final letterboxY = (viewportSize.height / _homeScale - _mapSize.height).clamp(0, double.infinity) / 2;
+    _boundaryMargin = EdgeInsets.symmetric(
+      horizontal: letterboxX + viewportSize.width / 2 / _homeScale,
+      vertical: letterboxY + viewportSize.height / 2 / _homeScale,
+    );
+
+    if (!mapChanged) return;
+    _homedMapSize = _mapSize;
+
+    final dx = (viewportSize.width - _mapSize.width * _homeScale) / 2;
+    final dy = (viewportSize.height - _mapSize.height * _homeScale) / 2;
+    _transformController.value = Matrix4.identity()
+      ..translate(dx, dy)
+      ..scale(_homeScale);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return InteractiveViewer(
-      minScale: 0.5,
-      maxScale: 5.0,
-      constrained: false,
-      child: GestureDetector(
-        onTapUp: _handleTap,
-        child: SizedBox(
-          width: _mapSize.width,
-          height: _mapSize.height,
-          child: RepaintBoundary(
-            child: CustomPaint(
-              size: _mapSize,
-              painter: MapPainter(
-                neutralShapes: _neutralShapes,
-                paths: _paths,
-                provinceColors: widget.provinceColors,
-                labelPositions: widget.labelPositions,
-                // Self-parsed positions first, so an explicit override from
-                // the caller (none exists today) always wins.
-                scPositions: {..._svgScPositions, ...widget.scPositions},
-                unitPositions: widget.unitPositions,
-                unitColors: widget.unitColors,
-                activeOrderUnitProvince: widget.activeOrderUnitProvince,
-                validTargetProvinces: widget.validTargetProvinces,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _homeTransform(Size(constraints.maxWidth, constraints.maxHeight));
+
+        return InteractiveViewer(
+          transformationController: _transformController,
+          // The home fit is itself the fully-zoomed-out view, so the lower
+          // bound sits a hair under it rather than at a fixed 0.5 — on a
+          // board bigger than the viewport (every shipped map, on a phone)
+          // a fixed 0.5 could still be too far in to show the whole thing.
+          minScale: _homeScale * 0.9,
+          maxScale: _homeScale * 6.7, // matches the Mini App's zoom range
+          constrained: false,
+          boundaryMargin: _boundaryMargin,
+          child: GestureDetector(
+            onTapUp: _handleTap,
+            child: SizedBox(
+              width: _mapSize.width,
+              height: _mapSize.height,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  size: _mapSize,
+                  painter: MapPainter(
+                    neutralShapes: _neutralShapes,
+                    paths: _paths,
+                    provinceClasses: _provinceClasses,
+                    parseGeneration: _parseGeneration,
+                    provinceColors: widget.provinceColors,
+                    labelPositions: widget.labelPositions,
+                    // Self-parsed positions first, so an explicit override
+                    // from the caller (none exists today) always wins.
+                    scPositions: {..._svgScPositions, ...widget.scPositions},
+                    unitPositions: widget.unitPositions,
+                    unitColors: widget.unitColors,
+                    activeOrderUnitProvince: widget.activeOrderUnitProvince,
+                    validTargetProvinces: widget.validTargetProvinces,
+                  ),
+                  foregroundPainter: OrderArrowsPainter(widget.orders),
+                ),
               ),
-              foregroundPainter: OrderArrowsPainter(widget.orders),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -258,6 +402,8 @@ class _MapViewerState extends State<MapViewer> {
 class MapPainter extends CustomPainter {
   final List<NeutralShape> neutralShapes;
   final Map<String, Path> paths;
+  final Map<String, String> provinceClasses;
+  final int parseGeneration;
   final Map<String, Color> provinceColors;
   final Map<String, Offset> labelPositions;
   final Map<String, Offset> scPositions;
@@ -269,6 +415,8 @@ class MapPainter extends CustomPainter {
   MapPainter({
     required this.neutralShapes,
     required this.paths,
+    required this.provinceClasses,
+    required this.parseGeneration,
     required this.provinceColors,
     required this.labelPositions,
     required this.scPositions,
@@ -280,6 +428,12 @@ class MapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // The province geometry on some maps (e.g. `ancient_med`) extends past
+    // the SVG's own `viewBox` — the browser clips to it, so this must too,
+    // or a sliver of bare scaffold background shows through in ragged
+    // notches at the board's edges instead of the "contain" fit being exact.
+    canvas.clipRect(Offset.zero & size);
+
     // 0. Draw the base cartography (land / sea / decorative coastline) that
     // has no gameplay role, so it sits *under* the interactive layer. Shapes
     // that exist only here (e.g. a small island with no matching province)
@@ -296,24 +450,41 @@ class MapPainter extends CustomPainter {
       );
     }
 
-    // 1. Draw Provinces
+    // 1. Draw Provinces: the province's own land/sea/island base fill first
+    // (this is the "unclaimed" look, matching the SVG's `<style>` block),
+    // then an owner tint on top when one exists, then the class's own
+    // stroke — sea and land are outlined differently in the source art, and
+    // a flat black 1px line was reading as an outline on a black ground
+    // rather than a border between two visibly different terrains.
     for (final entry in paths.entries) {
       final provinceId = entry.key;
       final path = entry.value;
+      final style = _neutralStyles[provinceClasses[provinceId]] ?? _neutralStyles['land']!;
 
-      // Transparent, not white, when nobody owns this province: the base
-      // layer drawn above (parchment land / sea) is the "unclaimed" look.
-      // A province colour, when present, is a translucent tint over it.
-      final paint = Paint()
-        ..color = provinceColors[provinceId] ?? Colors.transparent
-        ..style = PaintingStyle.fill;
-      canvas.drawPath(path, paint);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = style.$1
+          ..style = PaintingStyle.fill,
+      );
 
-      final strokePaint = Paint()
-        ..color = Colors.black
-        ..strokeWidth = 1.0
-        ..style = PaintingStyle.stroke;
-      canvas.drawPath(path, strokePaint);
+      final ownerColor = provinceColors[provinceId];
+      if (ownerColor != null) {
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = ownerColor
+            ..style = PaintingStyle.fill,
+        );
+      }
+
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = style.$2
+          ..strokeWidth = style.$3
+          ..style = PaintingStyle.stroke,
+      );
     }
 
     // 2. Draw Labels
@@ -391,10 +562,20 @@ class MapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant MapPainter oldDelegate) {
-    return !mapEquals(oldDelegate.provinceColors, provinceColors) ||
+    // `paths` (and `neutralShapes`) are mutated in place by `_parseSvg`, so
+    // old and new delegates always share the same map/list instance and a
+    // reference or `mapEquals` comparison on them is always false. The
+    // generation counter is what actually changes on a re-parse; the shape
+    // count is a cheap extra signal for the neutral layer, which has no
+    // per-entry identity to compare.
+    return oldDelegate.parseGeneration != parseGeneration ||
+        oldDelegate.neutralShapes.length != neutralShapes.length ||
+        !mapEquals(oldDelegate.provinceColors, provinceColors) ||
         !mapEquals(oldDelegate.unitPositions, unitPositions) ||
+        !mapEquals(oldDelegate.unitColors, unitColors) ||
+        !mapEquals(oldDelegate.labelPositions, labelPositions) ||
+        !mapEquals(oldDelegate.scPositions, scPositions) ||
         oldDelegate.activeOrderUnitProvince != activeOrderUnitProvince ||
-        !setEquals(oldDelegate.validTargetProvinces, validTargetProvinces) ||
-        oldDelegate.paths != paths;
+        !setEquals(oldDelegate.validTargetProvinces, validTargetProvinces);
   }
 }
