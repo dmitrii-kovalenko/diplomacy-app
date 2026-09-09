@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../models/game_model.dart';
 import '../../services/lobby_service.dart';
@@ -48,7 +49,9 @@ class _FindGameScreenState extends State<FindGameScreen> {
       setState(() => _foundGame = GameModel.fromJson(data['game']));
     } catch (e) {
       if (mounted) {
-        showToast(context, 'No room with that code.', isError: true);
+        showToast(
+            context, AppLocalizations.of(context)!.findRoomNotFoundToast,
+            isError: true);
       }
     } finally {
       if (mounted) {
@@ -68,18 +71,19 @@ class _FindGameScreenState extends State<FindGameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
     final code = _shareIdController.text.trim();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Join by code')),
+      appBar: AppBar(title: Text(loc.findRoomTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
         children: [
           const SizedBox(height: AppSpacing.xl),
           Text(
-            'Ask the host for their six-character room code.',
+            loc.findRoomInstructions,
             style: t.bodyMedium?.copyWith(color: c.labelSecondary),
             textAlign: TextAlign.center,
           ),
@@ -126,7 +130,7 @@ class _FindGameScreenState extends State<FindGameScreen> {
           ),
           const SizedBox(height: AppSpacing.xl),
           AppButton(
-            'Find room',
+            loc.findRoomButton,
             icon: CupertinoIcons.search,
             loading: _isLoading,
             onPressed: code.isEmpty ? null : _search,
@@ -136,7 +140,7 @@ class _FindGameScreenState extends State<FindGameScreen> {
             Padding(
               padding: const EdgeInsets.only(
                   left: AppSpacing.xs, bottom: AppSpacing.md),
-              child: Text('FOUND',
+              child: Text(loc.findRoomFoundLabel,
                   style: t.labelSmall
                       ?.copyWith(color: c.labelSecondary, letterSpacing: 0.6)),
             ),
@@ -151,11 +155,10 @@ class _FindGameScreenState extends State<FindGameScreen> {
               ),
             ),
           ] else if (_searched && !_isLoading)
-            const AppEmptyState(
+            AppEmptyState(
               icon: CupertinoIcons.search,
-              title: 'Nothing found',
-              message: 'Double-check the code — it is six characters, letters '
-                  'and digits.',
+              title: loc.findRoomEmptyTitle,
+              message: loc.findRoomEmptyMessage,
             ),
         ],
       ),

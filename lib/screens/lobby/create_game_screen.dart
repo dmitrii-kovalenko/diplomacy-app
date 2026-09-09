@@ -35,11 +35,27 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   bool _isLoading = false;
   bool _mapsLoading = true;
 
+  bool _defaultNameApplied = false;
+
   @override
   void initState() {
     super.initState();
     _nameController.addListener(() => setState(() {}));
     _fetchMaps();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A pre-filled evocative name beats an empty field with a hint — the
+    // player can always clear it, but a blank room name is rarely the
+    // intent, and each locale gets to pick its own flavour of default.
+    // AppLocalizations is only reachable once dependencies are available,
+    // so this can't happen in initState.
+    if (!_defaultNameApplied) {
+      _defaultNameApplied = true;
+      _nameController.text = AppLocalizations.of(context)!.defaultRoomName;
+    }
   }
 
   Future<void> _fetchMaps() async {
@@ -54,17 +70,20 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _mapsLoading = false);
-      showToast(context, 'Could not load maps. Pull back and try again.',
+      showToast(
+          context, AppLocalizations.of(context)!.createGameLoadMapsError,
           isError: true);
     }
   }
 
-  String get _selectedMapName {
+  String _selectedMapName(AppLocalizations loc) {
     final match = _maps.firstWhere(
       (m) => m['id']?.toString() == _selectedMap,
       orElse: () => null,
     );
-    if (match == null) return _mapsLoading ? 'Loading…' : 'None available';
+    if (match == null) {
+      return _mapsLoading ? loc.loadingEllipsis : loc.mapNoneAvailable;
+    }
     return match['name']?.toString() ?? '—';
   }
 
@@ -98,9 +117,9 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
       title: loc.turnLength,
       selected: _turnLength,
       options: [
-        (value: '12h', label: loc.hours12, detail: 'Fast, for focused groups'),
-        (value: '24h', label: loc.hours24, detail: 'The classic pace'),
-        (value: '48h', label: loc.hours48, detail: 'Relaxed, for long games'),
+        (value: '12h', label: loc.hours12, detail: loc.turnLength12Detail),
+        (value: '24h', label: loc.hours24, detail: loc.turnLength24Detail),
+        (value: '48h', label: loc.hours48, detail: loc.turnLength48Detail),
       ],
     );
     if (picked != null) setState(() => _turnLength = picked);
@@ -121,8 +140,11 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
+      debugPrint('Could not create the game: $e');
       if (mounted) {
-        showToast(context, 'Could not create the game. $e', isError: true);
+        showToast(
+            context, AppLocalizations.of(context)!.createGameGenericError,
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -149,18 +171,17 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
         padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
         children: [
           InsetSection(
-            header: 'Room',
+            header: loc.createGameRoomSection,
             children: [
               _FieldRow(
                 controller: _nameController,
                 label: loc.gameName,
-                hint: 'Congress of Vienna',
                 textInputAction: TextInputAction.next,
               ),
               InsetRow(
                 title: loc.map,
                 icon: CupertinoIcons.map,
-                value: _selectedMapName,
+                value: _selectedMapName(loc),
                 onTap: _maps.isEmpty ? null : () => _pickMap(loc),
               ),
               InsetRow(
@@ -172,30 +193,30 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
             ],
           ),
           InsetSection(
-            header: 'Rules',
-            footer: 'These cannot be changed once the first turn resolves.',
+            header: loc.createGameRulesSection,
+            footer: loc.createGameRulesFooter,
             children: [
               InsetSwitchRow(
                 title: loc.randomAssignment,
-                subtitle: 'Deal the powers at random when the room fills.',
+                subtitle: loc.randomAssignmentSubtitle,
                 value: _randomAssignment,
                 onChanged: (v) => setState(() => _randomAssignment = v),
               ),
               InsetSwitchRow(
                 title: loc.anonymous,
-                subtitle: 'Hide who plays which power until the game ends.',
+                subtitle: loc.anonymousSubtitle,
                 value: _isAnonymous,
                 onChanged: (v) => setState(() => _isAnonymous = v),
               ),
               InsetSwitchRow(
                 title: loc.privateRoom,
-                subtitle: 'Only players with the room code can join.',
+                subtitle: loc.privateRoomSubtitle,
                 value: _isPrivate,
                 onChanged: (v) => setState(() => _isPrivate = v),
               ),
               InsetSwitchRow(
                 title: loc.hostAsMaster,
-                subtitle: 'You referee instead of taking a power.',
+                subtitle: loc.hostAsMasterSubtitle,
                 value: _hostAsMaster,
                 onChanged: (v) => setState(() => _hostAsMaster = v),
               ),
@@ -203,12 +224,12 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
           ),
           InsetSection(
             header: loc.houseRules,
-            footer: 'Shown to everyone in the room before they commit.',
+            footer: loc.houseRulesFooter,
             children: [
               _FieldRow(
                 controller: _rulesController,
                 label: null,
-                hint: 'No stabs before 1902…',
+                hint: loc.houseRulesHint,
                 maxLines: 4,
               ),
             ],
@@ -219,7 +240,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
               child: Text(
-                'Give the room a name to continue.',
+                loc.createGameNeedsNameHint,
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../services/lobby_service.dart';
 import '../../theme/app_theme.dart';
@@ -39,24 +40,27 @@ class _CreateSandboxScreenState extends State<CreateSandboxScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _mapsLoading = false);
-      showToast(context, 'Could not load maps.', isError: true);
+      showToast(context, AppLocalizations.of(context)!.sandboxLoadMapsError,
+          isError: true);
     }
   }
 
-  String get _selectedMapName {
+  String _selectedMapName(AppLocalizations loc) {
     final match = _maps.firstWhere(
       (m) => m['id']?.toString() == _selectedMap,
       orElse: () => null,
     );
-    if (match == null) return _mapsLoading ? 'Loading…' : 'None available';
+    if (match == null) {
+      return _mapsLoading ? loc.loadingEllipsis : loc.mapNoneAvailable;
+    }
     return match['name']?.toString() ?? '—';
   }
 
-  Future<void> _pickMap() async {
+  Future<void> _pickMap(AppLocalizations loc) async {
     if (_maps.isEmpty) return;
     final picked = await showChoiceSheet<String>(
       context,
-      title: 'Map',
+      title: loc.map,
       selected: _selectedMap,
       options: [
         for (final m in _maps)
@@ -76,8 +80,10 @@ class _CreateSandboxScreenState extends State<CreateSandboxScreen> {
       await _lobbyService.createSandbox({'game_map_id': _selectedMap});
       if (mounted) Navigator.pop(context);
     } catch (e) {
+      debugPrint('Could not start the sandbox: $e');
       if (mounted) {
-        showToast(context, 'Could not start the sandbox. $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.sandboxCreateError,
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -86,11 +92,12 @@ class _CreateSandboxScreenState extends State<CreateSandboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sandbox')),
+      appBar: AppBar(title: Text(loc.sandboxLabel)),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
         children: [
@@ -112,25 +119,23 @@ class _CreateSandboxScreenState extends State<CreateSandboxScreen> {
                       size: 26, color: c.accent),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                Text('Play every power', style: t.displaySmall),
+                Text(loc.sandboxHeadline, style: t.displaySmall),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'A private board with no opponents and no deadlines. Move '
-                  'any unit, resolve the turn whenever you like — the fastest '
-                  'way to learn how adjudication actually works.',
+                  loc.sandboxDescription,
                   style: t.bodyMedium?.copyWith(color: c.labelSecondary),
                 ),
               ],
             ),
           ),
           InsetSection(
-            header: 'Board',
+            header: loc.sandboxBoardSection,
             children: [
               InsetRow(
-                title: 'Map',
+                title: loc.map,
                 icon: CupertinoIcons.map,
-                value: _selectedMapName,
-                onTap: _maps.isEmpty ? null : _pickMap,
+                value: _selectedMapName(loc),
+                onTap: _maps.isEmpty ? null : () => _pickMap(loc),
               ),
             ],
           ),
@@ -138,7 +143,7 @@ class _CreateSandboxScreenState extends State<CreateSandboxScreen> {
       ),
       bottomNavigationBar: BottomActionBar(
         child: AppButton(
-          'Start sandbox',
+          loc.sandboxStartButton,
           loading: _isLoading,
           onPressed: _selectedMap == null ? null : _createSandbox,
         ),

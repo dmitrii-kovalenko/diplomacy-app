@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../services/game_service.dart';
 import '../../theme/app_theme.dart';
@@ -50,7 +51,12 @@ class _TournamentScreenState extends State<TournamentScreen> {
       await _gameService.registerForTournament(widget.tournamentId);
       await _loadTournament();
     } catch (e) {
-      if (mounted) showToast(context, 'Could not register. $e', isError: true);
+      debugPrint('Could not register for tournament: $e');
+      if (mounted) {
+        showToast(
+            context, AppLocalizations.of(context)!.tournamentRegisterError,
+            isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isRegistering = false);
     }
@@ -58,6 +64,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
 
@@ -67,16 +74,16 @@ class _TournamentScreenState extends State<TournamentScreen> {
 
     if (_tournament == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Tournament')),
-        body: const AppEmptyState(
+        appBar: AppBar(title: Text(loc.tournamentTitle)),
+        body: AppEmptyState(
           icon: CupertinoIcons.rosette,
-          title: 'Tournament not found',
-          message: 'It may have finished or been cancelled.',
+          title: loc.tournamentNotFoundTitle,
+          message: loc.tournamentNotFoundMessage,
         ),
       );
     }
 
-    final name = (_tournament!['name'] ?? 'Tournament').toString();
+    final name = (_tournament!['name'] ?? loc.tournamentTitle).toString();
     final description = (_tournament!['description'] ?? '').toString();
     final status = (_tournament!['status'] ?? 'UNKNOWN').toString();
     final isRegistered = _tournament!['is_registered'] == true;
@@ -104,14 +111,16 @@ class _TournamentScreenState extends State<TournamentScreen> {
                   Row(
                     children: [
                       StatusPill(
-                        registrationOpen ? 'Registration open' : status,
+                        registrationOpen
+                            ? loc.tournamentRegistrationOpen
+                            : status,
                         tone: registrationOpen
                             ? StatusTone.accent
                             : StatusTone.neutral,
                       ),
                       if (isRegistered) ...[
                         const SizedBox(width: AppSpacing.sm),
-                        const StatusPill('You are in',
+                        StatusPill(loc.tournamentYouAreIn,
                             tone: StatusTone.positive,
                             icon: CupertinoIcons.check_mark),
                       ],
@@ -125,13 +134,12 @@ class _TournamentScreenState extends State<TournamentScreen> {
                   ],
                   if (registrationOpen && !isRegistered) ...[
                     const SizedBox(height: AppSpacing.xxl),
-                    AppButton('Register',
+                    AppButton(loc.tournamentRegisterButton,
                         loading: _isRegistering, onPressed: _register),
                   ] else if (registrationOpen && isRegistered) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Text(
-                      'Seats are drawn when registration closes. We will '
-                      'notify you when your board is ready.',
+                      loc.tournamentRegisteredNotice,
                       style: t.bodySmall?.copyWith(color: c.labelTertiary),
                     ),
                   ],
@@ -139,19 +147,21 @@ class _TournamentScreenState extends State<TournamentScreen> {
               ),
             ),
             if (games.isEmpty)
-              const AppEmptyState(
+              AppEmptyState(
                 icon: CupertinoIcons.square_grid_2x2,
-                title: 'No boards yet',
-                message: 'Games appear here once the draw is made.',
+                title: loc.tournamentNoBoardsTitle,
+                message: loc.tournamentNoBoardsMessage,
               )
             else
               InsetSection(
-                header: 'Boards',
+                header: loc.tournamentBoardsSection,
                 children: [
                   for (final game in games)
                     InsetRow(
-                      title:
-                          (game['name'] ?? 'Game ${game['id']}').toString(),
+                      title: (game['name'] ??
+                              loc.tournamentGameFallbackName(
+                                  game['id'].toString()))
+                          .toString(),
                       subtitle: game['status']?.toString(),
                       icon: CupertinoIcons.map,
                       onTap: () => Navigator.push(

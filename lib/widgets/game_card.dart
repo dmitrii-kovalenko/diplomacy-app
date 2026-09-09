@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../models/game_model.dart';
 import '../theme/app_theme.dart';
@@ -34,6 +35,7 @@ class GameCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
 
@@ -51,7 +53,7 @@ class GameCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  game.name.isEmpty ? 'Untitled game' : game.name,
+                  game.name.isEmpty ? loc.gameCardUntitled : game.name,
                   style: t.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -59,11 +61,13 @@ class GameCard extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               if (game.isPrivate)
-                _Glyph(CupertinoIcons.lock_fill, 'Private', c.labelTertiary),
+                _Glyph(CupertinoIcons.lock_fill, loc.gameCardPrivateTag,
+                    c.labelTertiary),
               if (game.isSandbox)
-                _Glyph(CupertinoIcons.wand_stars, 'Sandbox', c.labelTertiary),
+                _Glyph(CupertinoIcons.wand_stars, loc.sandboxLabel,
+                    c.labelTertiary),
               if (isMuted)
-                _Glyph(CupertinoIcons.bell_slash_fill, 'Muted',
+                _Glyph(CupertinoIcons.bell_slash_fill, loc.gameCardMutedTag,
                     c.labelTertiary),
               if (onEnter != null) ...[
                 const SizedBox(width: AppSpacing.xs),
@@ -75,11 +79,12 @@ class GameCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              StatusPill(_statusLabel, tone: _statusTone, icon: _statusIcon),
+              StatusPill(_statusLabel(loc),
+                  tone: _statusTone, icon: _statusIcon),
               const SizedBox(width: AppSpacing.sm),
               Flexible(
                 child: Text(
-                  _metaLine,
+                  _metaLine(loc),
                   style: t.bodySmall?.copyWith(color: c.labelSecondary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -110,7 +115,7 @@ class GameCard extends StatelessWidget {
               children: [
                 if (onJoin != null)
                   Expanded(
-                    child: AppButton('Join',
+                    child: AppButton(loc.gameCardJoinButton,
                         onPressed: onJoin,
                         style: AppButtonStyle.filled,
                         compact: true),
@@ -119,7 +124,7 @@ class GameCard extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                 if (onLeave != null)
                   Expanded(
-                    child: AppButton('Leave',
+                    child: AppButton(loc.gameCardLeaveButton,
                         onPressed: onLeave,
                         style: AppButtonStyle.tinted,
                         compact: true),
@@ -130,7 +135,9 @@ class GameCard extends StatelessWidget {
                     icon: isMuted
                         ? CupertinoIcons.bell_slash
                         : CupertinoIcons.bell,
-                    semanticLabel: isMuted ? 'Unmute game' : 'Mute game',
+                    semanticLabel: isMuted
+                        ? loc.gameCardUnmuteAction
+                        : loc.gameCardMuteAction,
                     onTap: onMuteToggle!,
                   ),
                 ],
@@ -142,19 +149,21 @@ class GameCard extends StatelessWidget {
     );
   }
 
-  String get _metaLine {
+  String _metaLine(AppLocalizations loc) {
     final parts = <String>[
-      game.mapName?.trim().isNotEmpty == true ? game.mapName! : 'Standard',
+      game.mapName?.trim().isNotEmpty == true
+          ? game.mapName!
+          : loc.gameCardStandardMap,
       if (game.phase != null && game.phase!.isNotEmpty) game.phase!,
       if (game.shareId != null && game.shareId!.isNotEmpty) '#${game.shareId}',
     ];
     return parts.join(' · ');
   }
 
-  String get _statusLabel => switch (game.status) {
-        0 => 'Open',
-        2 => 'Finished',
-        _ => 'In play',
+  String _statusLabel(AppLocalizations loc) => switch (game.status) {
+        0 => loc.gameCardStatusOpen,
+        2 => loc.gameCardStatusFinished,
+        _ => loc.gameCardStatusInPlay,
       };
 
   StatusTone get _statusTone => switch (game.status) {

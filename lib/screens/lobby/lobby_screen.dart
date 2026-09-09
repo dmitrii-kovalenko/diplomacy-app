@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../blocs/lobby/lobby_bloc.dart';
@@ -33,17 +34,18 @@ class LobbyScreen extends StatelessWidget {
   }
 
   void _showNewGameSheet(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     showAppSheet(
       context,
       builder: (ctx) => AppSheet(
-        title: 'Start playing',
+        title: loc.startPlaying,
         child: Padding(
           padding: const EdgeInsets.only(top: AppSpacing.sm),
           child: InsetSection(
             children: [
               InsetRow(
-                title: 'New game',
-                subtitle: 'Open a room and invite other powers',
+                title: loc.lobbyNewGameTitle,
+                subtitle: loc.lobbyNewGameSubtitle,
                 icon: CupertinoIcons.plus_circle_fill,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -51,8 +53,8 @@ class LobbyScreen extends StatelessWidget {
                 },
               ),
               InsetRow(
-                title: 'Sandbox',
-                subtitle: 'Play every power yourself, no deadlines',
+                title: loc.sandboxLabel,
+                subtitle: loc.lobbySandboxSubtitle,
                 icon: CupertinoIcons.wand_stars,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -60,8 +62,8 @@ class LobbyScreen extends StatelessWidget {
                 },
               ),
               InsetRow(
-                title: 'Join by code',
-                subtitle: 'Enter the six-character room code',
+                title: loc.findRoomTitle,
+                subtitle: loc.lobbyJoinByCodeSubtitle,
                 icon: CupertinoIcons.number,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -78,6 +80,7 @@ class LobbyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return ChangeNotifierProvider(
       create: (_) => LobbyBloc(),
@@ -92,10 +95,10 @@ class LobbyScreen extends StatelessWidget {
                   SliverAppBar.large(
                     pinned: true,
                     backgroundColor: c.bgBase,
-                    title: const Text('Games'),
+                    title: Text(loc.lobbyGamesTitle),
                     leading: IconButton(
                       icon: const Icon(CupertinoIcons.gear_alt),
-                      tooltip: 'Settings',
+                      tooltip: loc.settings,
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -105,7 +108,7 @@ class LobbyScreen extends StatelessWidget {
                     actions: [
                       IconButton(
                         icon: const Icon(CupertinoIcons.add),
-                        tooltip: 'Start playing',
+                        tooltip: loc.startPlaying,
                         onPressed: () => _showNewGameSheet(context),
                       ),
                       const SizedBox(width: AppSpacing.xs),
@@ -127,6 +130,7 @@ class LobbyScreen extends StatelessWidget {
   }
 
   List<Widget> _body(BuildContext context, LobbyBloc bloc) {
+    final loc = AppLocalizations.of(context)!;
     final isEmpty = bloc.yourTurn.isEmpty &&
         bloc.waiting.isEmpty &&
         bloc.openLobbies.isEmpty &&
@@ -146,9 +150,9 @@ class LobbyScreen extends StatelessWidget {
           hasScrollBody: false,
           child: AppEmptyState(
             icon: CupertinoIcons.wifi_slash,
-            title: "Couldn't load your games",
-            message: 'Check your connection and try again.',
-            actionLabel: 'Try again',
+            title: loc.lobbyLoadErrorTitle,
+            message: loc.lobbyLoadErrorMessage,
+            actionLabel: loc.tryAgain,
             onAction: () => bloc.refreshLobby(),
           ),
         ),
@@ -161,11 +165,9 @@ class LobbyScreen extends StatelessWidget {
           hasScrollBody: false,
           child: AppEmptyState(
             icon: CupertinoIcons.map,
-            title: 'No games yet',
-            message:
-                'Open a room, spin up a sandbox, or join a friend with their '
-                'room code.',
-            actionLabel: 'Start playing',
+            title: loc.lobbyEmptyTitle,
+            message: loc.lobbyEmptyMessage,
+            actionLabel: loc.startPlaying,
             onAction: () => _showNewGameSheet(context),
           ),
         ),
@@ -173,12 +175,12 @@ class LobbyScreen extends StatelessWidget {
     }
 
     return [
-      ..._section(context, 'Your turn', bloc.yourTurn),
-      ..._section(context, 'Waiting', bloc.waiting),
-      ..._section(context, 'Open lobbies', bloc.openLobbies),
-      ..._section(context, 'Observing', bloc.observed),
-      ..._section(context, 'Surrendered', bloc.surrendered),
-      ..._section(context, 'Finished', bloc.completed),
+      ..._section(context, loc.lobbySectionYourTurn, bloc.yourTurn),
+      ..._section(context, loc.lobbySectionWaiting, bloc.waiting),
+      ..._section(context, loc.lobbySectionOpenLobbies, bloc.openLobbies),
+      ..._section(context, loc.lobbySectionObserving, bloc.observed),
+      ..._section(context, loc.lobbySectionSurrendered, bloc.surrendered),
+      ..._section(context, loc.lobbySectionFinished, bloc.completed),
     ];
   }
 
