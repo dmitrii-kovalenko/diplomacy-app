@@ -52,7 +52,7 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Datenschutz-Einstellungen',
+                          Text('Privacy Settings',
                               style: t.displaySmall),
                           const SizedBox(height: AppSpacing.sm),
                           Text(
@@ -69,14 +69,14 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                     InsetSection(
                       children: [
                         const InsetSwitchRow(
-                          title: 'Notwendig',
+                          title: 'Necessary',
                           subtitle:
-                              'Erforderlich für die Grundfunktionen der App.',
+                              'Required for the core functions of the app.',
                           value: true,
                           onChanged: null,
                         ),
                         InsetSwitchRow(
-                          title: 'Analytik & Crashlytics',
+                          title: 'Analytics & Crashlytics',
                           subtitle:
                               'Hilft uns, Abstürze zu beheben und die App zu '
                               'verbessern.',
@@ -91,7 +91,7 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.gutter),
                       child: AppButton(
-                        'Speichern',
+                        'Save',
                         onPressed: () =>
                             Navigator.of(ctx).pop(analyticsEnabled),
                       ),

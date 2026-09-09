@@ -237,14 +237,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               header: 'Rechtliches',
               children: [
                 InsetRow(
-                  title: 'Impressum',
+                  title: 'Legal Notice (Impressum)',
                   icon: CupertinoIcons.building_2_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ImpressumScreen()),
                   ),
                 ),
                 InsetRow(
-                  title: 'Datenschutzerklärung',
+                  title: 'Privacy Policy',
                   icon: CupertinoIcons.hand_raised_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const PrivacyScreen()),

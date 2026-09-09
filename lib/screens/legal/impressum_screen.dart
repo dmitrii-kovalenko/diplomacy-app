@@ -8,12 +8,12 @@ class ImpressumScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const LegalScaffold(
-      title: 'Impressum',
-      intro: 'Angaben gemäß § 5 TMG.',
+      title: 'Legal Notice (Impressum)',
+      intro: 'Information in accordance with § 5 TMG.',
       children: [
-        LegalHeading('Verantwortlicher'),
+        LegalHeading('Responsible Party'),
         LegalFact(
-          label: 'Anschrift',
+          label: 'Address',
           lines: [
             'Max Mustermann',
             'Musterstraße 1',
@@ -22,17 +22,17 @@ class ImpressumScreen extends StatelessWidget {
           ],
         ),
         LegalFact(
-          label: 'Kontakt',
+          label: 'Contact',
           lines: [
             'kontakt@example.com',
             '+49 123 456789',
           ],
         ),
-        LegalHeading('Haftungsausschluss'),
+        LegalHeading('Disclaimer'),
         LegalBody(
-          'Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. Für '
-          'die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann '
-          'jedoch keine Gewähr übernommen werden.',
+          'The contents of this app were created with the utmost care. However, '
+          'no guarantee can be given for the accuracy, completeness, or '
+          'timeliness of the content.',
         ),
       ],
     );
