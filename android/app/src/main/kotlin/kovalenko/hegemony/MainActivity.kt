@@ -1,4 +1,4 @@
-package xyz.dmitrii_kovalenko.diplomacy_app
+package kovalenko.hegemony
 
 import io.flutter.embedding.android.FlutterActivity
 
