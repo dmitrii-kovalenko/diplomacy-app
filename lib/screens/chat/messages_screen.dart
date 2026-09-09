@@ -2,13 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import '../../services/e2ee_service.dart';
-import 'package:cryptography/cryptography.dart';
-import 'dart:convert';
 
 import '../../blocs/chat/chat_bloc.dart';
+import '../../services/e2ee_fingerprint.dart' as fp;
 import '../../theme/app_theme.dart';
 import '../../widgets/ui_kit.dart';
+import 'conversations_screen.dart';
 
 /// A single negotiation thread.
 ///
@@ -33,6 +32,7 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
+  bool _sending = false;
 
   @override
   void initState() {
@@ -49,11 +49,81 @@ class _MessagesScreenState extends State<MessagesScreen> {
     super.dispose();
   }
 
-  void _send(ChatBloc bloc) {
+  Future<void> _send(ChatBloc bloc) async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    bloc.sendMessage(widget.conversationId, text);
-    _controller.clear();
+    if (text.isEmpty || _sending) return;
+    // The text stays in the composer until the send resolves — a failed
+    // request must never look like it deleted what the player typed.
+    setState(() => _sending = true);
+    final ok = await bloc.sendMessage(widget.conversationId, text);
+    if (!mounted) return;
+    setState(() => _sending = false);
+    if (ok) {
+      _controller.clear();
+    } else {
+      showToast(context, 'Could not send that message. Try again.',
+          isError: true);
+    }
+  }
+
+  Future<void> _showFingerprintSheet(
+      BuildContext context, String peerPub) async {
+    final hex = await fp.fingerprint(peerPub);
+    final grouped = fp.formatFingerprint(hex);
+    if (!context.mounted) return;
+    await showAppSheet(
+      context,
+      builder: (ctx) {
+        final c = AppColors.of(ctx);
+        final t = Theme.of(ctx).textTheme;
+        return AppSheet(
+          title: 'Verify encryption',
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Compare this code with the other side, out loud or on '
+                  'another channel. A match means no one is between you.',
+                  style: t.bodyMedium?.copyWith(color: c.labelSecondary),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: c.fill,
+                    borderRadius: AppRadius.brMd,
+                  ),
+                  child: Text(
+                    grouped,
+                    textAlign: TextAlign.center,
+                    style: t.titleMedium?.copyWith(
+                      color: c.labelPrimary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppButton(
+                  'Copy',
+                  style: AppButtonStyle.tinted,
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: grouped));
+                    if (ctx.mounted) {
+                      showToast(ctx, 'Fingerprint copied to clipboard');
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -65,12 +135,23 @@ class _MessagesScreenState extends State<MessagesScreen> {
       value: widget.bloc,
       child: Consumer<ChatBloc>(
         builder: (context, bloc, child) {
-          final conv = bloc.conversations.firstWhere(
-            (c) => c['id'] == widget.conversationId,
-            orElse: () => <String, dynamic>{'title': 'Chat'},
-          );
-          final title = (conv['title'] ?? 'Chat').toString();
+          Map<String, dynamic>? found;
+          for (final entry in bloc.conversations) {
+            if (entry['id'] == widget.conversationId) {
+              found = entry;
+              break;
+            }
+          }
+          final conv = found ?? <String, dynamic>{};
+          final title = conversationLabel(conv, bloc.myEmpireCode);
           final isE2ee = conv['encryption'] == 'e2ee';
+          Map<String, dynamic>? peer;
+          for (final m in otherMembers(conv, bloc.myEmpireCode)) {
+            if (m['public_key'] != null) {
+              peer = m;
+              break;
+            }
+          }
           final msgs = bloc.messages[widget.conversationId] ?? [];
 
           return Scaffold(
@@ -85,21 +166,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       overflow: TextOverflow.ellipsis),
                   if (isE2ee)
                     GestureDetector(
-                      onTap: () async {
-                        final members = conv['members'] as List<dynamic>? ?? [];
-                        String? peerPub;
-                        for (final m in members) {
-                          if (m['public_key'] != E2EEService().myPublicKeyBase64 && m['public_key'] != null) {
-                            peerPub = m['public_key'];
-                            break;
-                          }
-                        }
-                        if (peerPub != null) {
-                          final bytes = base64Decode(peerPub);
-                          final hash = await Sha256().hash(bytes);
-                          final fp = hash.bytes.take(16).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
-                          await Clipboard.setData(ClipboardData(text: fp));
-                          if (mounted) showToast(context, 'Fingerprint copied to clipboard');
+                      onTap: () {
+                        final peerKey = peer?['public_key'] as String?;
+                        if (peerKey != null) {
+                          _showFingerprintSheet(context, peerKey);
                         }
                       },
                       child: Row(
@@ -141,6 +211,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 ),
                 _Composer(
                   controller: _controller,
+                  enabled: !_sending,
                   onSend: () => _send(bloc),
                 ),
               ],
@@ -166,7 +237,19 @@ class _Bubble extends StatelessWidget {
     final isMine = message['is_mine'] == true;
     final sender = message['sender_empire_name']?.toString();
     final text = message['text']?.toString();
-    final pending = text == null || text.isEmpty;
+    final scheme = message['scheme']?.toString();
+    final isLocked = message['_locked'] == true;
+    // Three states, not two: a message we know we can never read (no key
+    // resolved it, or decryption failed) shows a lock, distinct from one
+    // that is merely still on its way through decryption. Gate pending on
+    // the e2ee scheme specifically — every e2ee message is awaited through
+    // ChatBloc._decryptOne before it ever reaches this widget, so this is
+    // never actually the live path, but it is the *correct* condition. What
+    // used to trip this branch was a fernet/plain message whose `text` is
+    // `""`, which `crypto.decrypt_at_rest` returns on InvalidToken (a
+    // rotated CHAT_ENCRYPTION_KEY, a corrupt row) — that must render empty
+    // or locked, like the Mini App, never a permanent "Decrypting…".
+    final isPending = !isLocked && text == null && scheme == 'e2ee';
 
     // Only label the first bubble in a run from the same power — repeating the
     // name on every line is noise once the speaker is established.
@@ -204,23 +287,39 @@ class _Bubble extends StatelessWidget {
                     : Border.all(
                         color: c.separator, width: AppMetrics.hairline),
               ),
-              child: pending
+              child: isLocked
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(CupertinoIcons.lock_fill,
                             size: 12, color: c.labelTertiary),
                         const SizedBox(width: 6),
-                        Text('Decrypting…',
+                        Flexible(
+                          child: Text(
+                            "Encrypted — can't read with this key",
                             style: t.bodyMedium
-                                ?.copyWith(color: c.labelTertiary)),
+                                ?.copyWith(color: c.labelTertiary),
+                          ),
+                        ),
                       ],
                     )
-                  : Text(
-                      text,
-                      style: t.bodyLarge?.copyWith(
-                          color: isMine ? c.onAccent : c.labelPrimary),
-                    ),
+                  : isPending
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(CupertinoIcons.lock_fill,
+                                size: 12, color: c.labelTertiary),
+                            const SizedBox(width: 6),
+                            Text('Decrypting…',
+                                style: t.bodyMedium
+                                    ?.copyWith(color: c.labelTertiary)),
+                          ],
+                        )
+                      : Text(
+                          text!,
+                          style: t.bodyLarge?.copyWith(
+                              color: isMine ? c.onAccent : c.labelPrimary),
+                        ),
             ),
           ),
         ],
@@ -230,15 +329,20 @@ class _Bubble extends StatelessWidget {
 }
 
 class _Composer extends StatelessWidget {
-  const _Composer({required this.controller, required this.onSend});
+  const _Composer({
+    required this.controller,
+    required this.onSend,
+    this.enabled = true,
+  });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final canSend = controller.text.trim().isNotEmpty;
+    final canSend = enabled && controller.text.trim().isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -265,6 +369,7 @@ class _Composer extends StatelessWidget {
                   ),
                   child: TextField(
                     controller: controller,
+                    enabled: enabled,
                     minLines: 1,
                     maxLines: 5,
                     textCapitalization: TextCapitalization.sentences,

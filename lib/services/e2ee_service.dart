@@ -16,30 +16,77 @@ class E2EEService {
   EcKeyPair? _keyPair;
   String? myPublicKeyBase64;
 
-  Future<void> init() async {
+  // Memoizes `_doInit()` for the life of the app, not just for the span of
+  // one call: a second `ChatBloc` created later in the same launch — after
+  // the first has already finished — must not re-run `_repairPublication()`
+  // (an extra `GET`/`POST /api/me/key/` round trip for no reason). A launch
+  // that fails is retried: the identity check in the `catchError` below only
+  // clears the memo when it still points at *this* attempt, so a concurrent
+  // `resetKey()` that has already installed a fresh attempt is never
+  // clobbered by an older one finishing (successfully or not) after it.
+  Future<void>? _initFuture;
+
+  Future<void> init() {
+    final cached = _initFuture;
+    if (cached != null) return cached;
+    final future = _doInit();
+    _initFuture = future;
+    return future.catchError((Object e) {
+      if (identical(_initFuture, future)) _initFuture = null;
+      throw e;
+    });
+  }
+
+  Future<void> _doInit() async {
     final privKeyBase64 = await _storage.read(key: 'e2ee_priv_key');
     if (privKeyBase64 != null) {
       final privBytes = base64Decode(privKeyBase64);
       _keyPair = await _ecdh.newKeyPairFromSeed(privBytes);
       final pubKey = await _keyPair!.extractPublicKey();
       myPublicKeyBase64 = base64Encode([4, ...pubKey.x, ...pubKey.y]);
+      await _repairPublication();
     } else {
       _keyPair = await _ecdh.newKeyPair();
       final kpData = await _keyPair!.extract();
       final privBytes = kpData.d;
       await _storage.write(key: 'e2ee_priv_key', value: base64Encode(privBytes));
-      
+
       final pubKey = kpData.publicKey;
       // Uncompressed X9.62 format: 0x04 || X || Y
       final rawPub = [4, ...pubKey.x, ...pubKey.y];
       myPublicKeyBase64 = base64Encode(rawPub);
-      
+
       final dio = AuthService().dio;
       try {
         await dio.post('/api/me/key/', data: {'public_key': myPublicKeyBase64});
       } catch (e) {
         debugPrint('Failed to upload public key: $e');
       }
+    }
+  }
+
+  // Ports crypto.js's ensureEncryptionReady repair path: re-checks the
+  // server once per launch and republishes when it disagrees, so a key that
+  // failed to upload once (offline at first run, a transient 500, an
+  // expired token) is not silently stuck server-side as "no key" forever —
+  // that degrades every DM with this player to server-readable Fernet with
+  // no signal to either side. Only ever posts the key this instance already
+  // holds; a failure here (still offline, etc.) keeps the local key as-is.
+  // For an account with no linked Telegram id, `GET /api/me/key/` 400s
+  // every time (`game/api/keys.py` requires a `tg_id`) — not a meaningful
+  // check in that case, just a harmless no-op caught below.
+  Future<void> _repairPublication() async {
+    final dio = AuthService().dio;
+    try {
+      final response = await dio.get('/api/me/key/');
+      final data = response.data as Map;
+      final hasKey = data['has_key'] == true;
+      final serverKey = data['public_key'] as String?;
+      if (!hasKey || serverKey != myPublicKeyBase64) {
+        await dio.post('/api/me/key/', data: {'public_key': myPublicKeyBase64});
+      }
+    } catch (e) {
+      debugPrint('Key repair check failed, keeping local key: $e');
     }
   }
 
@@ -53,6 +100,12 @@ class E2EEService {
     await _storage.delete(key: 'e2ee_priv_key');
     _keyPair = null;
     myPublicKeyBase64 = null;
+    // Drop any completed init() memo — this is a deliberate new key, not a
+    // re-check of the old one. If an old _doInit() is still in flight, its
+    // own completion won't clobber the fresh attempt init() is about to
+    // install: the identity check in init()'s catchError only clears the
+    // memo when it still points at the attempt that failed.
+    _initFuture = null;
     await init();
   }
 
@@ -90,7 +143,10 @@ class E2EEService {
     };
   }
 
-  Future<String> decryptMessage(String ciphertextBase64, String ivBase64, String senderPubKeyBase64) async {
+  // Returns null on failure — never a placeholder string. The caller (chat
+  // history / websocket handler) turns a null into a locked-bubble state;
+  // it must never render literally as message text.
+  Future<String?> decryptMessage(String ciphertextBase64, String ivBase64, String senderPubKeyBase64) async {
     try {
       final sharedSecret = await deriveSharedSecret(senderPubKeyBase64);
       final rawCipher = base64Decode(ciphertextBase64);
@@ -112,7 +168,7 @@ class E2EEService {
       return utf8.decode(decrypted);
     } catch (e) {
       debugPrint('Decryption failed: $e');
-      return '[Decryption Failed]';
+      return null;
     }
   }
 

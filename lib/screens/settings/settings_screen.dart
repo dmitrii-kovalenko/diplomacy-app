@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../../config/app_config.dart';
 import '../../services/auth_service.dart';
 import '../../services/e2ee_service.dart';
+import '../../services/e2ee_fingerprint.dart' as fp;
 import '../../providers/locale_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui_kit.dart';
@@ -31,6 +33,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AuthService _authService = AuthService();
   final E2EEService _e2eeService = E2EEService();
   bool _isResetting = false;
+  String? _fingerprint;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFingerprint();
+  }
+
+  // Same grouped-by-four rendering as the Mini App's openEncryptionSettings
+  // and the bot's /mykey, so a player can read this aloud and the other side
+  // can compare it character-for-character. `init()` only ever otherwise ran
+  // from ChatBloc, so a player who opens Settings before ever opening a
+  // conversation would see no key at all without calling it here too;
+  // E2EEService's own memoization makes this a no-op once chat has already
+  // initialised it.
+  Future<void> _loadFingerprint() async {
+    await _e2eeService.init();
+    if (!mounted) return;
+    final pub = _e2eeService.myPublicKeyBase64;
+    if (pub == null) {
+      setState(() => _fingerprint = null);
+      return;
+    }
+    final hex = await fp.fingerprint(pub);
+    if (!mounted) return;
+    setState(() => _fingerprint = fp.formatFingerprint(hex));
+  }
 
   static const Map<String, String> _languages = {
     'en': 'English',
@@ -57,7 +86,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _e2eeService.resetKey();
     if (!mounted) return;
     setState(() => _isResetting = false);
+    await _loadFingerprint();
+    if (!mounted) return;
     showToast(context, 'A new key pair was generated.');
+  }
+
+  Future<void> _copyFingerprint() async {
+    final value = _fingerprint;
+    if (value == null) return;
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!mounted) return;
+    showToast(context, 'Fingerprint copied to clipboard.');
   }
 
   /// Maps a Flutter locale code to the code `settings.LANGUAGES` on the
@@ -220,6 +259,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : StatusTone.positive,
                   ),
                 ),
+                if (pub != null)
+                  InsetRow(
+                    title: 'Your fingerprint',
+                    subtitle: _fingerprint ?? 'Computing…',
+                    icon: CupertinoIcons.number,
+                    iconColor: c.green,
+                    showChevron: false,
+                    onTap: _fingerprint == null ? null : _copyFingerprint,
+                    trailing: _fingerprint == null
+                        ? null
+                        : Icon(CupertinoIcons.doc_on_doc,
+                            size: 15, color: c.labelTertiary),
+                  ),
                 InsetRow(
                   title: 'Reset key pair',
                   icon: CupertinoIcons.arrow_2_circlepath,
