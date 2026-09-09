@@ -1,4 +1,5 @@
 {
+  "@@locale": "en",
   "login": "Login",
   "signUp": "Sign Up",
   "submitOrder": "Submit Order",

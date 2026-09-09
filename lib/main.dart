@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -114,6 +115,13 @@ Future<bool> _showConsentSheet(BuildContext context) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The board screen is a Column of [banner?, Expanded(map), command bar]
+  // with no landscape layout behind it — a rotated device just squeezes the
+  // map under a relatively larger app bar and command bar. Lock portrait
+  // before the first frame so there is no rotation window during launch.
+  await SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+  ]);
   if (defaultTargetPlatform == TargetPlatform.android) {
     await Firebase.initializeApp();
   } else {
@@ -155,7 +163,27 @@ class DiplomacyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('en')],
+      supportedLocales: AppLocalizations.supportedLocales,
+      // localeResolutionCallback only ever sees preferredLocales.first
+      // (flutter/lib/src/widgets/app.dart), so a device set to e.g.
+      // [fr-FR, ru-RU] would resolve on French alone and miss the Russian
+      // match at position two. localeListResolutionCallback gets the whole
+      // list, so walk all of it before giving up. The default fallback is
+      // supportedLocales.first, which is 'cv' (Chuvash) purely because of
+      // ARB file alphabetical order — fall back to English instead for a
+      // device whose entire preference list we do not ship.
+      localeListResolutionCallback: (deviceLocales, supportedLocales) {
+        if (deviceLocales != null) {
+          for (final deviceLocale in deviceLocales) {
+            for (final supported in supportedLocales) {
+              if (supported.languageCode == deviceLocale.languageCode) {
+                return supported;
+              }
+            }
+          }
+        }
+        return const Locale('en');
+      },
       home: const InitializerScreen(),
     );
   }

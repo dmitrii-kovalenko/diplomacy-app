@@ -60,6 +60,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showToast(context, 'A new key pair was generated.');
   }
 
+  /// Maps a Flutter locale code to the code `settings.LANGUAGES` on the
+  /// server accepts. Ukrainian is the one mismatch: the server deliberately
+  /// registers it as `ua`, not the ISO `uk` (see the comment on `LANGUAGES`
+  /// in `DjangoProject/settings.py`), because devices already advertise
+  /// `Accept-Language: uk` for auto-detection and the in-app switch needed a
+  /// code that would never collide with that. Every other code is identity.
+  static String _serverLanguageCode(String flutterCode) =>
+      flutterCode == 'uk' ? 'ua' : flutterCode;
+
   Future<void> _changeLanguage(String current) async {
     final lang = await showChoiceSheet<String>(
       context,
@@ -77,10 +86,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .setLocale(Locale(lang));
 
     try {
-      await _authService.dio
-          .post('/api/settings/language/', data: {'language': lang});
+      await _authService.dio.post('/api/settings/language/',
+          data: {'language': _serverLanguageCode(lang)});
     } catch (_) {
-      // The local choice already applied; syncing it is best-effort.
+      if (!mounted) return;
+      showToast(
+        context,
+        'Could not sync the language to your account — it will only apply '
+        'on this device for now.',
+        isError: true,
+      );
     }
   }
 
