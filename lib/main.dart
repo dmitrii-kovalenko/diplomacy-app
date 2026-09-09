@@ -19,7 +19,11 @@ import 'widgets/ui_kit.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await Firebase.initializeApp();
+  } else {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
   // Handle background message
 }
 
@@ -110,19 +114,12 @@ Future<bool> _showConsentSheet(BuildContext context) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Check analytics consent stored from a previous session
-  const storage = FlutterSecureStorage();
-  final consentValue = await storage.read(key: 'analytics_consent');
-
-  // Apply consent to Firebase Analytics (consent banner shown later by InitializerScreen
-  // if the key is absent; here we handle already-set values).
-  if (consentValue != null) {
-    final enabled = consentValue == 'true';
-    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(enabled);
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await Firebase.initializeApp();
+  } else {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   }
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(
     MultiProvider(
