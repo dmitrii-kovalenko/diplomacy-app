@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "646660581815",
+    "project_id": "hegemony-game",
+    "storage_bucket": "hegemony-game.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:646660581815:android:895cc9d8ca75b8172be032",
+        "android_client_info": {
+          "package_name": "com.kovalenko.hegemony"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1QpyvBN157VrsORYErLOVqz2roWIfGY8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
