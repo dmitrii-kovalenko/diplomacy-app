@@ -1,6 +1,6 @@
 /// App configuration for environment-aware settings.
 class AppConfig {
-  static const String appName = 'Diplomacy';
+  static const String appName = 'Hegemony';
   static const String appVersion = '1.0.0';
 
   // Backend API base URL

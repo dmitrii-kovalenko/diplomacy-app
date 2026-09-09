@@ -146,7 +146,7 @@ class DiplomacyApp extends StatelessWidget {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Diplomacy',
+      title: 'Hegemony',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(platform),
       darkTheme: AppTheme.dark(platform),
@@ -290,7 +290,7 @@ class BrandMark extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xxl),
           Text(
-            'DIPLOMACY',
+            'HEGEMONY',
             style: t.titleLarge?.copyWith(
               color: c.labelPrimary,
               letterSpacing: 6,
