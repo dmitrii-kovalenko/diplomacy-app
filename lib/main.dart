@@ -179,26 +179,36 @@ class _InitializerScreenState extends State<InitializerScreen> {
   }
 
   Future<void> _checkAuth() async {
-    // Show consent banner on first launch (when analytics_consent key is absent)
-    final consentValue = await _storage.read(key: 'analytics_consent');
-    if (consentValue == null && mounted) {
-      final granted = await _showConsentSheet(context);
-      await _storage.write(
-        key: 'analytics_consent',
-        value: granted ? 'true' : 'false',
-      );
-      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(granted);
-    }
-
-    final token = await _storage.read(key: 'access_token');
-    if (!mounted) return;
-
-    if (token == null) {
-      _navigateTo(const LoginScreen());
-      return;
-    }
-
     try {
+      String? consentValue;
+      String? token;
+      try {
+        consentValue = await _storage.read(key: 'analytics_consent');
+        token = await _storage.read(key: 'access_token');
+      } catch (e) {
+        // If Android Keystore is corrupted due to reinstall, wipe it to recover
+        await _storage.deleteAll();
+      }
+
+      if (!mounted) return;
+
+      if (consentValue == null) {
+        // Wait for first frame to render before showing a bottom sheet
+        await Future.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+        final granted = await _showConsentSheet(context);
+        await _storage.write(
+          key: 'analytics_consent',
+          value: granted ? 'true' : 'false',
+        );
+        await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(granted);
+      }
+
+      if (token == null) {
+        _navigateTo(const LoginScreen());
+        return;
+      }
+
       final me = await _authService.fetchMe();
       if (!mounted) return;
 
@@ -218,7 +228,7 @@ class _InitializerScreenState extends State<InitializerScreen> {
       if (!mounted) return;
       // If it's explicitly a 401, the interceptor would have logged us out.
       // If the tokens are gone, we are truly logged out.
-      final currentToken = await _storage.read(key: 'access_token');
+      final currentToken = await _storage.read(key: 'access_token').catchError((_) => null);
       if (currentToken == null) {
         _navigateTo(const LoginScreen());
       } else {
