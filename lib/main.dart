@@ -56,9 +56,8 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                               style: t.displaySmall),
                           const SizedBox(height: AppSpacing.sm),
                           Text(
-                            'Du entscheidest, welche Daten wir verarbeiten '
-                            'dürfen. Die Auswahl lässt sich jederzeit in den '
-                            'Einstellungen ändern.',
+                            'You decide which data we process. You can change '
+                            'this at any time in the settings.',
                             style:
                                 t.bodyMedium?.copyWith(color: c.labelSecondary),
                           ),
