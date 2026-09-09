@@ -158,7 +158,7 @@ class DiplomacyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: AppLocalizations.supportedLocales,
+      supportedLocales: const [Locale('en')],
       home: const InitializerScreen(),
     );
   }
