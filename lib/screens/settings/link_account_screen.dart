@@ -8,8 +8,6 @@ import 'dart:convert';
 
 import '../../services/auth_service.dart';
 import '../../services/e2ee_service.dart';
-import 'package:flutter/services.dart';
-import 'dart:convert';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui_kit.dart';
 import '../auth/login_screen.dart';
@@ -89,15 +87,27 @@ bool _isGenerating = false;
           .post('/api/auth/link/merge/', data: {'code': code});
       await _authService.saveTokens(res.data);
       
+      var keyImported = parts.length <= 1; // nothing to import isn't a failure
       if (parts.length > 1) {
         try {
           final jwkStr = utf8.decode(base64Decode(parts[1]));
           await _e2eeService.importKey(jwkStr);
-        } catch (_) {}
+          keyImported = true;
+        } catch (_) {
+          keyImported = false;
+        }
       }
-      
+
       if (!mounted) return;
-      showToast(context, 'Accounts linked. Sign in once more to finish.');
+      showToast(
+        context,
+        keyImported
+            ? 'Accounts linked. Sign in once more to finish.'
+            : 'Accounts linked, but the encryption key in that code was '
+                'unreadable — reset your key in Settings if old chats look '
+                'wrong.',
+        isError: !keyImported,
+      );
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
@@ -209,13 +219,18 @@ bool _isGenerating = false;
           child: TextField(
             controller: _codeController,
             textAlign: TextAlign.center,
-            textCapitalization: TextCapitalization.characters,
             autocorrect: false,
             cursorColor: c.accent,
+            // The 6-char code is uppercase-only (and normalised with
+            // .toUpperCase() before it's sent — see _mergeAccount), but the
+            // E2EE key appended after it is case-sensitive base64: an
+            // earlier version of this field force-uppercased everything
+            // typed or natively pasted here, silently corrupting that key
+            // on every merge that carried one. `/` was also missing from
+            // the allowed character set, which corrupted it a second way.
+            // Never transform case, and allow the full base64 alphabet.
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-\=\_\+]')),
-              TextInputFormatter.withFunction(
-                  (_, next) => next.copyWith(text: next.text.toUpperCase())),
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-=_+/]')),
             ],
             style: t.displayMedium?.copyWith(
               letterSpacing: 10,
