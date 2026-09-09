@@ -12,7 +12,20 @@
           "package_name": "com.kovalenko.hegemony"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "646660581815-9q0phqb00cbs6ag8704usrq48e2rjpka.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kovalenko.hegemony",
+            "certificate_hash": "207b05582277da66f0a6a0e71818c44806cc14f7"
+          }
+        },
+        {
+          "client_id": "646660581815-v0vnh6bbpi5nfg358l7c1pabf262064h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB1QpyvBN157VrsORYErLOVqz2roWIfGY8"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "646660581815-v0vnh6bbpi5nfg358l7c1pabf262064h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
