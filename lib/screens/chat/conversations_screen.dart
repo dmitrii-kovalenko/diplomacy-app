@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../blocs/chat/chat_bloc.dart';
@@ -11,8 +12,11 @@ import 'messages_screen.dart';
 /// by the *other* members' countries, joined. `Conversation.title` is an
 /// optional field the create endpoint accepts and almost nobody sets, and an
 /// empty string is not null, so it must be checked explicitly rather than
-/// relying on `??`.
-String conversationLabel(Map<String, dynamic> conv, String? myEmpireCode) {
+/// relying on `??`. Takes the fallback name as a parameter rather than
+/// `AppLocalizations.of(context)` itself, so this stays a plain, testable
+/// helper with no BuildContext of its own.
+String conversationLabel(
+    Map<String, dynamic> conv, String? myEmpireCode, String fallback) {
   final title = (conv['title'] ?? '').toString().trim();
   if (title.isNotEmpty) return title;
   final members = List<Map<String, dynamic>>.from(conv['members'] as List? ?? []);
@@ -25,7 +29,7 @@ String conversationLabel(Map<String, dynamic> conv, String? myEmpireCode) {
       .whereType<String>()
       .where((n) => n.isNotEmpty)
       .toList();
-  return names.isNotEmpty ? names.join(', ') : 'Conversation';
+  return names.isNotEmpty ? names.join(', ') : fallback;
 }
 
 /// The other members of a conversation, for colour dots and chip lists —
@@ -75,6 +79,7 @@ class ConversationsScreen extends StatelessWidget {
       builder: (ctx) {
         final c = AppColors.of(ctx);
         final t = Theme.of(ctx).textTheme;
+        final loc = AppLocalizations.of(ctx)!;
         // Listens to the bloc directly rather than snapshotting
         // `bloc.participants` once: this builder runs a single time when the
         // sheet opens, so a snapshot never sees a fetch that was still in
@@ -91,7 +96,7 @@ class ConversationsScreen extends StatelessWidget {
                 .toList();
             return StatefulBuilder(
               builder: (ctx, setState) => AppSheet(
-                title: 'New conversation',
+                title: loc.chatNewConversationTitle,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0,
                       AppSpacing.gutter, AppSpacing.lg),
@@ -100,8 +105,7 @@ class ConversationsScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Pick who is at the table. Everyone selected sees '
-                        'every message in this thread.',
+                        loc.chatPickWhoIsAtTable,
                         style: t.bodyMedium?.copyWith(color: c.labelSecondary),
                       ),
                       const SizedBox(height: AppSpacing.xl),
@@ -118,13 +122,13 @@ class ConversationsScreen extends StatelessWidget {
                           child: Column(
                             children: [
                               Text(
-                                'Could not load the other powers.',
+                                loc.chatCouldNotLoadOtherCountries,
                                 style: t.bodyMedium
                                     ?.copyWith(color: c.labelSecondary),
                               ),
                               const SizedBox(height: AppSpacing.md),
                               AppButton(
-                                'Retry',
+                                loc.retryButton,
                                 style: AppButtonStyle.tinted,
                                 onPressed: () => bloc.retryParticipants(),
                               ),
@@ -136,7 +140,7 @@ class ConversationsScreen extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.lg),
                           child: Text(
-                            'No other countries in this game.',
+                            loc.chatNoOtherCountriesInGame,
                             style: t.bodyMedium
                                 ?.copyWith(color: c.labelSecondary),
                           ),
@@ -168,8 +172,8 @@ class ConversationsScreen extends StatelessWidget {
                       const SizedBox(height: AppSpacing.xxl),
                       AppButton(
                         selected.isEmpty
-                            ? 'Select at least one power'
-                            : 'Start chat with ${selected.length}',
+                            ? loc.chatPickAtLeastOneCountry
+                            : loc.chatStartChatWithCount(selected.length),
                         onPressed: selected.isEmpty
                             ? null
                             : () async {
@@ -181,8 +185,7 @@ class ConversationsScreen extends StatelessWidget {
                                 } else {
                                   showToast(
                                     ctx,
-                                    'Could not start that conversation. '
-                                    'Try again.',
+                                    loc.chatCouldNotStartConversationToast,
                                     isError: true,
                                   );
                                 }
@@ -208,18 +211,20 @@ class ConversationsScreen extends StatelessWidget {
       child: Builder(
         builder: (context) => Scaffold(
           body: Consumer<ChatBloc>(
-            builder: (context, bloc, child) => CustomScrollView(
+            builder: (context, bloc, child) {
+              final loc = AppLocalizations.of(context)!;
+              return CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics()),
               slivers: [
                 SliverAppBar.large(
                   pinned: true,
                   backgroundColor: c.bgBase,
-                  title: const Text('Messages'),
+                  title: Text(loc.chatMessagesTitle),
                   actions: [
                     IconButton(
                       icon: const Icon(CupertinoIcons.square_pencil),
-                      tooltip: 'New conversation',
+                      tooltip: loc.chatNewConversationTitle,
                       onPressed: () =>
                           _showNewConversationSheet(context, bloc),
                     ),
@@ -234,11 +239,9 @@ class ConversationsScreen extends StatelessWidget {
                     hasScrollBody: false,
                     child: AppEmptyState(
                       icon: CupertinoIcons.bubble_left_bubble_right,
-                      title: 'No conversations yet',
-                      message:
-                          'Diplomacy is won in private. Open a channel with '
-                          'one power — or several.',
-                      actionLabel: 'New conversation',
+                      title: loc.chatNoConversationsYetTitle,
+                      message: loc.chatNoConversationsYetMessage,
+                      actionLabel: loc.chatNewConversationTitle,
                       onAction: () =>
                           _showNewConversationSheet(context, bloc),
                     ),
@@ -270,7 +273,8 @@ class ConversationsScreen extends StatelessWidget {
                 const SliverToBoxAdapter(
                     child: SizedBox(height: AppSpacing.huge)),
               ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -293,18 +297,20 @@ class _ConversationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
 
     final unread = (conversation['unread'] as num?)?.toInt() ?? 0;
-    final title = conversationLabel(conversation, myEmpireCode);
+    final title = conversationLabel(
+        conversation, myEmpireCode, loc.chatConversationFallbackName);
     final others = otherMembers(conversation, myEmpireCode);
     final last = conversation['last_message'];
     final isE2ee = conversation['encryption'] == 'e2ee';
     final isMuted = conversation['is_muted'] == true;
     final preview = last == null
-        ? 'No messages yet'
+        ? loc.chatNoMessagesYet
         : (last['text']?.toString().trim().isNotEmpty == true
             ? last['text'].toString()
-            : 'Encrypted message');
+            : loc.chatEncryptedMessagePreview);
 
     return RowHighlight(
       onTap: onTap,

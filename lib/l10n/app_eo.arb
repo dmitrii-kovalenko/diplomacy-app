@@ -2,7 +2,7 @@
   "@@locale": "eo",
   "login": "Ensaluti",
   "signUp": "Registriĝi",
-  "submitOrder": "Sendi mendon",
+  "submitOrder": "Sendi ordonon",
   "createLobby": "Krei ludon",
   "settings": "Agordoj",
   "language": "Lingvo",
@@ -111,6 +111,8 @@
   "gameCardStatusOpen": "Malfermita",
   "gameCardStatusFinished": "Finita",
   "gameCardStatusInPlay": "Daŭranta",
+  "tournamentStatusFinished": "Finita",
+  "tournamentStatusCancelled": "Nuligita",
   "consentTitle": "Agordoj de privateco",
   "consentSubtitle": "Vi decidas kiujn datumojn ni prilaboras. Vi povas ŝanĝi tion iam ajn en la agordoj.",
   "consentNecessaryTitle": "Necesa",
@@ -195,5 +197,123 @@
   "legalPrivacySectionAnalytics": "4. Analizaj Iloj (Firebase kaj Crashlytics)",
   "legalPrivacySectionE2ee": "5. Fin-al-fina Ĉifrado",
   "legalPrivacySectionRights": "6. Viaj Rajtoj",
-  "commonCancel": "Nuligi"
+  "commonCancel": "Nuligi",
+  "commonUnknown": "Nekonata",
+  "orderHold": "Tenu",
+  "orderMove": "Movu",
+  "orderSupport": "Subteno",
+  "orderConvoy": "Konvojo",
+  "orderBuild": "Konstruu",
+  "orderDisband": "Dissolvi",
+  "orderRetreat": "Retiriĝo",
+  "unitArmy": "Armeo",
+  "unitFleet": "Floto",
+  "gameSurrenderTitle": "Ĉu kapitulaci?",
+  "gameSurrenderMessage": "Viaj unuoj restas sur la mapo kaj tenas sian pozicion. Vi ne povos realiĝi al ĉi tiu ludo.",
+  "gameSurrenderConfirm": "Kapitulaci",
+  "gameProposeDrawTitle": "Proponas remizon?",
+  "gameProposeDrawMessage": "Ĉiuj ankoraŭ ludantaj voĉdonas. La ludo finiĝas per komuna remizo nur se ĉiuj akceptas.",
+  "gameProposeDrawConfirm": "Proponi remizon",
+  "gameProposeDrawMenuItem": "Proponi remizon",
+  "gameDisbandUnitTitle": "Ĉu dissolvi ĉi tiun unuon?",
+  "gameDisbandUnitMessage": "Ĝi forlasas la mapon por la resto de la ludo. Ĉi tio ne malfareblas.",
+  "gameWhichCoast": "Kiu marbordo de {code}?",
+  "@gameWhichCoast": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "gameHistoryTitle": "Historio",
+  "gameViewHistory": "Vidi historion",
+  "gameEarlierTurn": "Antaŭa turno",
+  "gameLaterTurn": "Sekva turno",
+  "gameBackToLiveBoard": "Reen al la nuna ludo",
+  "gameMyOrdersTooltip": "Miaj ordonoj",
+  "gameMoreTooltip": "Pli",
+  "gameOrdersDrawerTitle": "Ordonoj",
+  "gameNoOrdersYetTitle": "Ankoraŭ neniuj ordonoj",
+  "gameNoOrdersYetMessage": "Frapu unu el viaj unuoj sur la mapo por doni al ĝi ordon.",
+  "gameCancelOrderFailedToast": "Ne eblis nuligi tiun ordonon.",
+  "gameSubmitOrderFailedToast": "Ne eblis sendi tiun ordonon.",
+  "gameCancelOrder": "Nuligi ordonon",
+  "gameCancelBuild": "Nuligi konstruon",
+  "gameCancelDisband": "Nuligi dissolvon",
+  "gameCancelRetreat": "Nuligi retiriĝon",
+  "gamePendingOrderStatus": "Atendata: {orderType} en {province}",
+  "@gamePendingOrderStatus": {
+    "placeholders": {
+      "orderType": {
+        "type": "String"
+      },
+      "province": {
+        "type": "String"
+      }
+    }
+  },
+  "gameDrawBannerTitle": "Remizo proponita",
+  "gameDrawWaitingOnOthers": "Atendante la aliajn potencojn…",
+  "gameDrawEveryoneMustAccept": "Ĉiu restanta potenco devas akcepti.",
+  "gameDrawAccept": "Akceptu",
+  "gameDrawReject": "Malakcepti",
+  "gameTargetPromptDefault": "Frapu celprovincon",
+  "gameTargetPromptRetreat": "Frapu apudan provincon por retiriĝi tien",
+  "gameTargetPromptSupportAux": "Frapu la unuon, kiun vi subtenas",
+  "gameTargetPromptSupportTarget": "Frapu celprovincon aŭ uzu la butonon \"Subtenu tenadon\".",
+  "gameTargetPromptConvoyAux": "Frapu la armeon al konvojo",
+  "gameTargetPromptConvoyTarget": "Frapu la konvojan celon",
+  "gameSupportHold": "Subtenu tenadon",
+  "gameReadyLabel": "Preta",
+  "gameNotReadyLabel": "Ne preta",
+  "gameYourMoveLabel": "Via vico",
+  "gameOrderCountEmpty": "Frapu unu el viaj unuoj por doni al ĝi ordon",
+  "gameOrdersSubmitted": "{count, plural, =0{Ankoraŭ neniuj ordonoj} one{{count} ordono fiksita} other{{count} ordonoj fiksitaj}}",
+  "@gameOrdersSubmitted": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "gameLoadErrorToast": "Ne eblis ŝargi la ludon.",
+  "gameHistoryLoadErrorToast": "Ne eblis ŝargi tiun turnon.",
+  "gameNoResolvedTurnsYet": "Ankoraŭ neniu antaŭa turno.",
+  "gameLoadingBoard": "Ŝargante la mapon…",
+  "gameLoadingHistory": "Ŝargante historion…",
+  "gameCoastPickerUnavailableToast": "Ĉi tiu provinco bezonas marbordon, sed neniu elektilo estas disponebla.",
+  "gamePreviewTitle": "Ludo",
+  "gamePreviewUnavailableTitle": "Ludo ne disponebla",
+  "gamePreviewUnavailableMessage": "Ne eblis ŝargi la mapon de ĉi tiu ludo.",
+  "chatMessagesTitle": "Mesaĝoj",
+  "chatNewConversationTitle": "Nova konversacio",
+  "chatPickWhoIsAtTable": "Elektu, kiu sidas ĉe la tablo. Ĉiuj elektitoj vidos ĉiun mesaĝon en ĉi tiu konversacio.",
+  "chatPickAtLeastOneCountry": "Elektu almenaŭ unu landon",
+  "chatCouldNotLoadOtherCountries": "Ne eblis ŝargi la aliajn landojn.",
+  "chatNoOtherCountriesInGame": "Neniuj aliaj landoj en ĉi tiu ludo.",
+  "chatStartChatWithCount": "{count, plural, one{Komenci konversacion kun {count} lando} other{Komenci konversacion kun {count} landoj}}",
+  "@chatStartChatWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "chatCouldNotStartConversationToast": "Ne eblis komenci tiun konversacion. Provu denove.",
+  "chatConversationFallbackName": "Konversacio",
+  "chatNoConversationsYetTitle": "Ankoraŭ neniuj konversacioj",
+  "chatNoConversationsYetMessage": "Diplomatio estas gajnata private. Malfermu kanalon kun unu potenco — aŭ pluraj.",
+  "chatNoMessagesYet": "Ankoraŭ neniuj mesaĝoj",
+  "chatEncryptedMessagePreview": "Ĉifrita mesaĝo",
+  "chatVerifyEncryptionTitle": "Kontroli la ĉifradon",
+  "chatVerifyEncryptionDescription": "Komparu ĉi tiun kodon kun la alia flanko, laŭte aŭ per alia kanalo. Kongruo signifas, ke neniu estas inter vi.",
+  "chatCopyButton": "Kopii",
+  "chatEndToEndEncryptedTapToVerify": "Fin-al-fine ĉifrita (frapu por kontroli)",
+  "chatNothingSaidYetTitle": "Ankoraŭ nenio dirita",
+  "chatNothingSaidYetMessage": "Komencu per oferto. Aŭ mensogo.",
+  "chatEncryptedCannotReadWithKey": "Ĉifrita — ne povas legi per ĉi tiu ŝlosilo",
+  "chatDecryptingEllipsis": "Malĉifrado…",
+  "chatMessageHint": "Mesaĝo",
+  "chatSendMessageSemantic": "Sendi mesaĝon",
+  "chatCouldNotSendMessageToast": "Ne eblis sendi tiun mesaĝon. Provu denove."
 }

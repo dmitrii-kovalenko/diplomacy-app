@@ -8,7 +8,7 @@
   "language": "Чӗлхе",
   "preferences": "Кӑмӑлсем",
   "security": "Хӑрушсӑрлӑх",
-  "about": "Программа çинчен",
+  "about": "Программа ҫинчен",
   "logOut": "Тух",
   "email": "Email",
   "password": "Password",
@@ -32,7 +32,7 @@
   "appInfo": "App Info",
   "version": "Version 1.0.0 (Build 42)",
   "startPlaying": "Выляма пуҫла",
-  "lobbyNewGameTitle": "Çӗнӗ вӑйӑ",
+  "lobbyNewGameTitle": "Ҫӗнӗ вӑйӑ",
   "lobbyNewGameSubtitle": "Пӳлӗм уҫӑр та ытти вӑйсене чӗнӗр",
   "sandboxLabel": "Хӑйӑр ещӗкӗ",
   "lobbySandboxSubtitle": "Пур вӑйсемшӗн те хӑвӑрах вылӑр, вӗҫленмелли вӑхӑтсӑр",
@@ -111,6 +111,8 @@
   "gameCardStatusOpen": "Уҫӑ",
   "gameCardStatusFinished": "Пӗтернӗ",
   "gameCardStatusInPlay": "Тӑсӑлать",
+  "tournamentStatusFinished": "Пӗтернӗ",
+  "tournamentStatusCancelled": "Пӑрахӑҫланӑ",
   "consentTitle": "Вӑрттӑнлӑх ӗнерлевӗсем",
   "consentSubtitle": "Хӑш даннӑйсене эпир ӗҫлеттернине эсир хӑвӑр йышӑнатӑр. Кирек хӑҫан та ӗнерлевсенче улӑштарма пултаратӑр.",
   "consentNecessaryTitle": "Кирлӗ",
@@ -195,5 +197,123 @@
   "legalPrivacySectionAnalytics": "4. Анализ Хатӗрӗсем (Firebase тата Crashlytics)",
   "legalPrivacySectionE2ee": "5. Вӗҫӗ-хӗррисӗр Шифрлав",
   "legalPrivacySectionRights": "6. Сирӗн Прависем",
-  "commonCancel": "Пӑрахӑҫ ту"
+  "commonCancel": "Пӑрахӑҫ ту",
+  "commonUnknown": "Паллӑ мар",
+  "orderHold": "Тытса тӑр",
+  "orderMove": "Куҫ",
+  "orderSupport": "Пулӑшу",
+  "orderConvoy": "Конвой",
+  "orderBuild": "Ларт",
+  "orderDisband": "Салан",
+  "orderRetreat": "Чак",
+  "unitArmy": "Ҫар",
+  "unitFleet": "Флот",
+  "gameSurrenderTitle": "Парӑнмалла-и?",
+  "gameSurrenderMessage": "Сирӗн единицӑсем карттӑ ҫинче юлаҫҫӗ те тытса тӑраҫҫӗ. Ҫак вӑйӑна каялла кӗме юрамасть.",
+  "gameSurrenderConfirm": "Парӑн",
+  "gameProposeDrawTitle": "Ничья сӗнмелле-и?",
+  "gameProposeDrawMessage": "Вылякансем сасӑлаҫҫӗ. Пурте йышӑнсан анчах вӑйӑ пӗрле ничьяпа вӗҫленет.",
+  "gameProposeDrawConfirm": "Ничья сӗн",
+  "gameProposeDrawMenuItem": "Ничья сӗн",
+  "gameDisbandUnitTitle": "Ҫак единицӑна салатмалла-и?",
+  "gameDisbandUnitMessage": "Вӑл вӑйӑ вӗҫне ҫитиех карттӑран тухать. Каялла тавӑрма ҫук.",
+  "gameWhichCoast": "{code}-ӑн хӑш ҫыранӗ?",
+  "@gameWhichCoast": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "gameHistoryTitle": "Истори",
+  "gameViewHistory": "Историе пӑх",
+  "gameEarlierTurn": "Унчченхи черет",
+  "gameLaterTurn": "Тепӗр черет",
+  "gameBackToLiveBoard": "Хальхи вӑйӑ патне таврӑн",
+  "gameMyOrdersTooltip": "Манӑн заказсем",
+  "gameMoreTooltip": "Тата",
+  "gameOrdersDrawerTitle": "Заказсем",
+  "gameNoOrdersYetTitle": "Заказ ҫук-ха",
+  "gameNoOrdersYetMessage": "Заказ пама карттӑ ҫинчи хӑвӑрӑн пӗр-пӗр единицӑна пусӑр.",
+  "gameCancelOrderFailedToast": "Заказа пӑрахӑҫлама май килмерӗ.",
+  "gameSubmitOrderFailedToast": "Заказа яма май килмерӗ.",
+  "gameCancelOrder": "Заказ пӑрахӑҫла",
+  "gameCancelBuild": "Сборкӑна пӑрахӑҫла",
+  "gameCancelDisband": "Салатассине пӑрахӑҫла",
+  "gameCancelRetreat": "Отступление пӑрахӑҫла",
+  "gamePendingOrderStatus": "Кӗтсе тӑрать: {orderType} — {province}",
+  "@gamePendingOrderStatus": {
+    "placeholders": {
+      "orderType": {
+        "type": "String"
+      },
+      "province": {
+        "type": "String"
+      }
+    }
+  },
+  "gameDrawBannerTitle": "Ничья сӗннӗ",
+  "gameDrawWaitingOnOthers": "Ытти вӑйсене кӗтетпӗр…",
+  "gameDrawEveryoneMustAccept": "Юлнӑ пур вӑй та килӗшмелле.",
+  "gameDrawAccept": "Йышӑн",
+  "gameDrawReject": "Тирке",
+  "gameTargetPromptDefault": "Ҫитес провинцие пусӑр",
+  "gameTargetPromptRetreat": "Каялла тавӑрма юнашар провинцие пусӑр",
+  "gameTargetPromptSupportAux": "Эсир пулӑшакан блока пусӑр",
+  "gameTargetPromptSupportTarget": "Ҫитес провинцие пусӑр е «Тытса тӑма пулӑшӑр» кнопкӑпа усӑ курӑр.",
+  "gameTargetPromptConvoyAux": "Ҫара колонна ҫине пус",
+  "gameTargetPromptConvoyTarget": "Конвой ҫулне пусӑр",
+  "gameSupportHold": "Тытса тӑма пулӑшӑр",
+  "gameReadyLabel": "Хатӗр",
+  "gameNotReadyLabel": "Хатӗр мар",
+  "gameYourMoveLabel": "Сирӗн черет",
+  "gameOrderCountEmpty": "Заказ пама хӑвӑрӑн пӗр-пӗр единицӑна пусӑр",
+  "gameOrdersSubmitted": "{count, plural, =0{Заказ ҫук-ха} one{{count} заказ хатӗрленӗ} other{{count} заказ хатӗрленӗ}}",
+  "@gameOrdersSubmitted": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "gameLoadErrorToast": "Вӑйӑна ҫӗклеме май килмерӗ.",
+  "gameHistoryLoadErrorToast": "Ҫак черете ҫӗклеме май килмерӗ.",
+  "gameNoResolvedTurnsYet": "Унчченхи черет ҫук-ха.",
+  "gameLoadingBoard": "Карттӑ тиенет…",
+  "gameLoadingHistory": "Истори тиенет…",
+  "gameCoastPickerUnavailableToast": "Ҫак провинцие ҫыран кирлӗ, анчах суйламалли ҫук.",
+  "gamePreviewTitle": "Вӑйӑ",
+  "gamePreviewUnavailableTitle": "Вӑйӑ ҫук",
+  "gamePreviewUnavailableMessage": "Ку вӑйӑн карттине тиеме май килмерӗ.",
+  "chatMessagesTitle": "Хыпарсем",
+  "chatNewConversationTitle": "Ҫӗнӗ калаҫу",
+  "chatPickWhoIsAtTable": "Сӗтел хушшинче кам пуррине суйлӑр. Суйланисем ҫак калаҫури кашни хыпара курӗҫ.",
+  "chatPickAtLeastOneCountry": "Пӗр ҫӗршыв хат суйла",
+  "chatCouldNotLoadOtherCountries": "Ытти ҫӗршывсене ҫӗклеме май килмерӗ.",
+  "chatNoOtherCountriesInGame": "Ку вӑйӑра ытти ҫӗршыв ҫук.",
+  "chatStartChatWithCount": "{count, plural, one{{count} ҫӗршывпа калаҫу пуҫла} other{{count} ҫӗршывпа калаҫу пуҫла}}",
+  "@chatStartChatWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "chatCouldNotStartConversationToast": "Калаҫу пуҫлама май килмерӗ. Каллех тӑрӑшса пӑхӑр.",
+  "chatConversationFallbackName": "Калаҫу",
+  "chatNoConversationsYetTitle": "Калаҫу ҫук-ха",
+  "chatNoConversationsYetMessage": "Дипломати вӑрттӑн ҫӗнтерӳсемпе паллӑ. Пӗр вӑйпа — е темиҫе вӑйпа — канал уҫӑр.",
+  "chatNoMessagesYet": "Хыпар ҫук-ха",
+  "chatEncryptedMessagePreview": "Шифрланӑ хыпар",
+  "chatVerifyEncryptionTitle": "Шифровкӑна тӗрӗсле",
+  "chatVerifyEncryptionDescription": "Ҫак кода тепӗр енпе сасӑпа е урӑх канал урлӑ танлаштарӑр. Тӳр килни хушшӑрта никам та ҫуккине пӗлтерет.",
+  "chatCopyButton": "Копи",
+  "chatEndToEndEncryptedTapToVerify": "Вӗҫӗ-хӗррисӗр шифрланӑ (тӗрӗслеме пусӑр)",
+  "chatNothingSaidYetTitle": "Ним те каламан-ха",
+  "chatNothingSaidYetMessage": "Сӗнӳпе пуҫлӑр. Е суйпа.",
+  "chatEncryptedCannotReadWithKey": "Шифрланӑ — ҫак уҫҫипе вулама май ҫук",
+  "chatDecryptingEllipsis": "Дешифровка…",
+  "chatMessageHint": "Хыпар",
+  "chatSendMessageSemantic": "Хыпар яр",
+  "chatCouldNotSendMessageToast": "Хыпар яма май килмерӗ. Каллех тӑрӑшса пӑхӑр."
 }

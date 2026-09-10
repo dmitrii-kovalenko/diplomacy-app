@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 
@@ -61,7 +62,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     if (ok) {
       _controller.clear();
     } else {
-      showToast(context, 'Could not send that message. Try again.',
+      showToast(context, AppLocalizations.of(context)!.chatCouldNotSendMessageToast,
           isError: true);
     }
   }
@@ -76,8 +77,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
       builder: (ctx) {
         final c = AppColors.of(ctx);
         final t = Theme.of(ctx).textTheme;
+        final loc = AppLocalizations.of(ctx)!;
         return AppSheet(
-          title: 'Verify encryption',
+          title: loc.chatVerifyEncryptionTitle,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
                 AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.lg),
@@ -86,8 +88,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Compare this code with the other side, out loud or on '
-                  'another channel. A match means no one is between you.',
+                  loc.chatVerifyEncryptionDescription,
                   style: t.bodyMedium?.copyWith(color: c.labelSecondary),
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -109,12 +110,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppButton(
-                  'Copy',
+                  loc.chatCopyButton,
                   style: AppButtonStyle.tinted,
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: grouped));
                     if (ctx.mounted) {
-                      showToast(ctx, 'Fingerprint copied to clipboard');
+                      showToast(ctx,
+                          AppLocalizations.of(ctx)!.settingsFingerprintCopiedToast);
                     }
                   },
                 ),
@@ -135,6 +137,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       value: widget.bloc,
       child: Consumer<ChatBloc>(
         builder: (context, bloc, child) {
+          final loc = AppLocalizations.of(context)!;
           Map<String, dynamic>? found;
           for (final entry in bloc.conversations) {
             if (entry['id'] == widget.conversationId) {
@@ -143,7 +146,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
             }
           }
           final conv = found ?? <String, dynamic>{};
-          final title = conversationLabel(conv, bloc.myEmpireCode);
+          final title = conversationLabel(
+              conv, bloc.myEmpireCode, loc.chatConversationFallbackName);
           final isE2ee = conv['encryption'] == 'e2ee';
           Map<String, dynamic>? peer;
           for (final m in otherMembers(conv, bloc.myEmpireCode)) {
@@ -178,7 +182,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           Icon(CupertinoIcons.lock_fill,
                               size: 10, color: c.green),
                           const SizedBox(width: 4),
-                          Text('End-to-end encrypted (tap to verify)',
+                          Text(loc.chatEndToEndEncryptedTapToVerify,
                               style: t.labelSmall?.copyWith(color: c.green)),
                         ],
                       ),
@@ -190,10 +194,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
               children: [
                 Expanded(
                   child: msgs.isEmpty
-                      ? const AppEmptyState(
+                      ? AppEmptyState(
                           icon: CupertinoIcons.bubble_left,
-                          title: 'Nothing said yet',
-                          message: 'Open with an offer. Or a lie.',
+                          title: loc.chatNothingSaidYetTitle,
+                          message: loc.chatNothingSaidYetMessage,
                         )
                       : ListView.builder(
                           controller: _scroll,
@@ -233,6 +237,7 @@ class _Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
 
     final isMine = message['is_mine'] == true;
     final sender = message['sender_empire_name']?.toString();
@@ -296,7 +301,7 @@ class _Bubble extends StatelessWidget {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            "Encrypted — can't read with this key",
+                            loc.chatEncryptedCannotReadWithKey,
                             style: t.bodyMedium
                                 ?.copyWith(color: c.labelTertiary),
                           ),
@@ -310,7 +315,7 @@ class _Bubble extends StatelessWidget {
                             Icon(CupertinoIcons.lock_fill,
                                 size: 12, color: c.labelTertiary),
                             const SizedBox(width: 6),
-                            Text('Decrypting…',
+                            Text(loc.chatDecryptingEllipsis,
                                 style: t.bodyMedium
                                     ?.copyWith(color: c.labelTertiary)),
                           ],
@@ -342,6 +347,7 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final loc = AppLocalizations.of(context)!;
     final canSend = enabled && controller.text.trim().isNotEmpty;
 
     return Container(
@@ -376,7 +382,7 @@ class _Composer extends StatelessWidget {
                     cursorColor: c.accent,
                     style: Theme.of(context).textTheme.bodyLarge,
                     decoration: InputDecoration(
-                      hintText: 'Message',
+                      hintText: loc.chatMessageHint,
                       hintStyle: Theme.of(context)
                           .textTheme
                           .bodyLarge
@@ -394,7 +400,7 @@ class _Composer extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Semantics(
                 button: true,
-                label: 'Send message',
+                label: loc.chatSendMessageSemantic,
                 child: PressableScale(
                   onTap: canSend ? onSend : null,
                   child: AnimatedContainer(

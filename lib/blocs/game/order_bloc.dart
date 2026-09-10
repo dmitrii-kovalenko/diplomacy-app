@@ -25,6 +25,15 @@ enum OrderState {
 
 enum ActionType { hold, move, support, convoy, retreat, buildArmy, buildFleet, disband }
 
+// The bloc has no BuildContext of its own to resolve a localized string
+// with, so a failure is reported as a reason code instead of English copy —
+// the screen that owns onOrderError picks the AppLocalizations message.
+// submitFailed also carries the server's error text as `detail`, but that
+// text is for the log only: game/api/orders.py and validation.py return
+// English literals, and on a crash a raw exception class name, none of which
+// is fit to show a player in their own language.
+enum OrderErrorKind { cancelFailed, coastPickerUnavailable, submitFailed }
+
 // Numeric codes mirroring DjangoProject/game/choices.py — the API sends and
 // expects these ints on the wire, never the display strings this bloc used
 // to compare against. Keep this block in sync with choices.py by hand; there
@@ -77,7 +86,7 @@ class OrderBloc extends ChangeNotifier {
   Map<String, dynamic>? gameState; // To read current unit states if needed
 
   final VoidCallback? onOrderSubmitted;
-  final void Function(String message)? onOrderError;
+  final void Function(OrderErrorKind kind, {String? detail})? onOrderError;
 
   // Fleet move (or fleet build) into a split-coast province needs a coast —
   // the screen owns the actual picker UI since this bloc has no
@@ -554,7 +563,7 @@ class OrderBloc extends ChangeNotifier {
       await _gameService.cancelOrder(id.toString());
       onOrderSubmitted?.call();
     } catch (e) {
-      onOrderError?.call('Could not cancel that order.');
+      onOrderError?.call(OrderErrorKind.cancelFailed);
     }
   }
 
@@ -614,7 +623,7 @@ class OrderBloc extends ChangeNotifier {
       final prompt = onCoastPrompt;
       if (prompt == null) {
         reset();
-        onOrderError?.call('This province needs a coast, but no picker is available.');
+        onOrderError?.call(OrderErrorKind.coastPickerUnavailable);
         return;
       }
       // A move has a real source to filter the coast list by — a fleet at
@@ -663,7 +672,10 @@ class OrderBloc extends ChangeNotifier {
       onOrderSubmitted?.call();
     } catch (e) {
       debugPrint('Order submission failed: $e');
-      onOrderError?.call(e.toString().replaceFirst('Exception: ', ''));
+      onOrderError?.call(
+        OrderErrorKind.submitFailed,
+        detail: e.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 }

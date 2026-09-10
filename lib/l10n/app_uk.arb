@@ -111,6 +111,8 @@
   "gameCardStatusOpen": "Відкрита",
   "gameCardStatusFinished": "Завершена",
   "gameCardStatusInPlay": "Триває",
+  "tournamentStatusFinished": "Завершено",
+  "tournamentStatusCancelled": "Скасовано",
   "consentTitle": "Налаштування конфіденційності",
   "consentSubtitle": "Ви вирішуєте, які дані ми обробляємо. Ви можете змінити це в будь-який час у налаштуваннях.",
   "consentNecessaryTitle": "Обов'язкові",
@@ -195,5 +197,123 @@
   "legalPrivacySectionAnalytics": "4. Інструменти аналізу (Firebase і Crashlytics)",
   "legalPrivacySectionE2ee": "5. Наскрізне шифрування",
   "legalPrivacySectionRights": "6. Ваші права",
-  "commonCancel": "Скасувати"
+  "commonCancel": "Скасувати",
+  "commonUnknown": "Невідомо",
+  "orderHold": "Стояти",
+  "orderMove": "Іти",
+  "orderSupport": "Підтримка",
+  "orderConvoy": "Конвой",
+  "orderBuild": "Побудувати",
+  "orderDisband": "Розпустити",
+  "orderRetreat": "Відступити",
+  "unitArmy": "Армія",
+  "unitFleet": "Флот",
+  "gameSurrenderTitle": "Здатися?",
+  "gameSurrenderMessage": "Ваші підрозділи залишаться на мапі і будуть стояти в обороні. Повернутися до цієї партії буде неможливо.",
+  "gameSurrenderConfirm": "Здатися",
+  "gameProposeDrawTitle": "Запропонувати нічию?",
+  "gameProposeDrawMessage": "Усі, хто ще грає, голосують. Партія завершиться нічиєю, лише якщо погодяться всі.",
+  "gameProposeDrawConfirm": "Запропонувати нічию",
+  "gameProposeDrawMenuItem": "Запропонувати нічию",
+  "gameDisbandUnitTitle": "Розпустити цей підрозділ?",
+  "gameDisbandUnitMessage": "Він покине мапу до кінця партії. Скасувати це буде неможливо.",
+  "gameWhichCoast": "Який берег {code}?",
+  "@gameWhichCoast": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "gameHistoryTitle": "Історія",
+  "gameViewHistory": "Переглянути історію",
+  "gameEarlierTurn": "Попередній хід",
+  "gameLaterTurn": "Наступний хід",
+  "gameBackToLiveBoard": "Назад до поточної партії",
+  "gameMyOrdersTooltip": "Мої накази",
+  "gameMoreTooltip": "Ще",
+  "gameOrdersDrawerTitle": "Накази",
+  "gameNoOrdersYetTitle": "Наказів поки немає",
+  "gameNoOrdersYetMessage": "Натисніть на один зі своїх підрозділів на мапі, щоб віддати наказ.",
+  "gameCancelOrderFailedToast": "Не вдалося скасувати наказ.",
+  "gameSubmitOrderFailedToast": "Не вдалося відправити наказ.",
+  "gameCancelOrder": "Скасувати наказ",
+  "gameCancelBuild": "Скасувати будівництво",
+  "gameCancelDisband": "Скасувати розпуск",
+  "gameCancelRetreat": "Скасувати відступ",
+  "gamePendingOrderStatus": "У черзі: {orderType} у {province}",
+  "@gamePendingOrderStatus": {
+    "placeholders": {
+      "orderType": {
+        "type": "String"
+      },
+      "province": {
+        "type": "String"
+      }
+    }
+  },
+  "gameDrawBannerTitle": "Запропоновано нічию",
+  "gameDrawWaitingOnOthers": "Чекаємо на інші держави…",
+  "gameDrawEveryoneMustAccept": "Усі держави, що залишилися, мають погодитися.",
+  "gameDrawAccept": "Прийняти",
+  "gameDrawReject": "Відхилити",
+  "gameTargetPromptDefault": "Натисніть провінцію призначення",
+  "gameTargetPromptRetreat": "Натисніть сусідню провінцію, куди відступити",
+  "gameTargetPromptSupportAux": "Натисніть на підрозділ, який підтримуєте",
+  "gameTargetPromptSupportTarget": "Натисніть провінцію призначення або кнопку «Підтримати оборону».",
+  "gameTargetPromptConvoyAux": "Натисніть на армію для конвою",
+  "gameTargetPromptConvoyTarget": "Натисніть, куди конвоювати",
+  "gameSupportHold": "Підтримати оборону",
+  "gameReadyLabel": "Готовий",
+  "gameNotReadyLabel": "Не готовий",
+  "gameYourMoveLabel": "Ваш хід",
+  "gameOrderCountEmpty": "Натисніть на один зі своїх підрозділів, щоб віддати наказ",
+  "gameOrdersSubmitted": "{count, plural, =0{Наказів поки немає} one{{count} наказ віддано} few{{count} накази віддано} many{{count} наказів віддано} other{{count} наказів віддано}}",
+  "@gameOrdersSubmitted": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "gameLoadErrorToast": "Не вдалося завантажити гру.",
+  "gameHistoryLoadErrorToast": "Не вдалося завантажити цей хід.",
+  "gameNoResolvedTurnsYet": "Минулих ходів ще немає.",
+  "gameLoadingBoard": "Завантаження мапи…",
+  "gameLoadingHistory": "Завантаження історії…",
+  "gameCoastPickerUnavailableToast": "Цій провінції потрібен берег, але вибір недоступний.",
+  "gamePreviewTitle": "Партія",
+  "gamePreviewUnavailableTitle": "Партія недоступна",
+  "gamePreviewUnavailableMessage": "Не вдалося завантажити мапу цієї гри.",
+  "chatMessagesTitle": "Повідомлення",
+  "chatNewConversationTitle": "Нова бесіда",
+  "chatPickWhoIsAtTable": "Оберіть, хто буде за столом переговорів. Усі обрані бачитимуть кожне повідомлення в цій бесіді.",
+  "chatPickAtLeastOneCountry": "Оберіть принаймні одну країну",
+  "chatCouldNotLoadOtherCountries": "Не вдалося завантажити інші країни.",
+  "chatNoOtherCountriesInGame": "В цій грі немає інших країн.",
+  "chatStartChatWithCount": "{count, plural, one{Почати бесіду з {count} країною} other{Почати бесіду з {count} країнами}}",
+  "@chatStartChatWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "chatCouldNotStartConversationToast": "Не вдалося розпочати бесіду. Спробуйте ще раз.",
+  "chatConversationFallbackName": "Бесіда",
+  "chatNoConversationsYetTitle": "Бесід ще немає",
+  "chatNoConversationsYetMessage": "Дипломатію виграють у кулуарах. Відкрийте канал з однією державою — або з кількома.",
+  "chatNoMessagesYet": "Повідомлень поки немає",
+  "chatEncryptedMessagePreview": "Зашифроване повідомлення",
+  "chatVerifyEncryptionTitle": "Перевірка шифрування",
+  "chatVerifyEncryptionDescription": "Порівняйте цей код з іншою стороною вголос або іншим каналом зв'язку. Збіг означає, що між вами нікого немає.",
+  "chatCopyButton": "Копіювати",
+  "chatEndToEndEncryptedTapToVerify": "Наскрізне шифрування (натисніть для перевірки)",
+  "chatNothingSaidYetTitle": "Поки нічого не сказано",
+  "chatNothingSaidYetMessage": "Почніть із пропозиції. Або брехні.",
+  "chatEncryptedCannotReadWithKey": "Зашифровано — неможливо прочитати за допомогою цього ключа",
+  "chatDecryptingEllipsis": "Розшифрування…",
+  "chatMessageHint": "Повідомлення",
+  "chatSendMessageSemantic": "Надіслати повідомлення",
+  "chatCouldNotSendMessageToast": "Не вдалося надіслати повідомлення. Спробуйте ще раз."
 }

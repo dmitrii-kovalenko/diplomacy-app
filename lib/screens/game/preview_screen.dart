@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../models/board_state.dart';
 import '../../services/game_service.dart';
@@ -126,10 +127,11 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final (unitPositions, unitColors) = _computeUnitPositionsAndColors();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Board'),
+        title: Text(loc.gamePreviewTitle),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: AppSpacing.lg),
@@ -144,9 +146,9 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
           : _svgString == null
               ? AppEmptyState(
                   icon: CupertinoIcons.map,
-                  title: 'Board unavailable',
-                  message: 'The map for this game could not be loaded.',
-                  actionLabel: 'Try again',
+                  title: loc.gamePreviewUnavailableTitle,
+                  message: loc.gamePreviewUnavailableMessage,
+                  actionLabel: loc.tryAgain,
                   onAction: () {
                     setState(() => _isLoading = true);
                     _loadPreview();

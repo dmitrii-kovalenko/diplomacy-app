@@ -31,37 +31,46 @@ int? _parseStatus(dynamic raw) =>
 
 /// The tournament status pill's label.
 ///
-/// Plain English on purpose, not an [AppLocalizations] lookup: the ARB
-/// files are owned by a concurrent localization pass at the time of this
-/// fix, so these words are left for that sweep to convert into proper
-/// translation keys rather than added here as a fourth language file edit.
-String _tournamentStatusLabel(dynamic raw) {
+/// Reuses the game-status vocabulary ([AppLocalizations.gameCardStatusInPlay])
+/// for "active" — that word is a bare present-tense verb in every shipped
+/// language, so it carries no grammatical gender and applies equally to a
+/// tournament or a game. "Finished" and "cancelled" get their own keys
+/// instead of reusing [AppLocalizations.gameCardStatusFinished]: Russian and
+/// Ukrainian inflect those words for the gender of the noun they describe,
+/// and "турнир"/"турнір" (tournament, masculine) does not take the same form
+/// as "игра"/"гра" (game, feminine) — see locale/ru/LC_MESSAGES/django.po's
+/// separate `отменена` (game) vs `отменён` (tournament) for the cancellation
+/// notice this mirrors.
+String _tournamentStatusLabel(AppLocalizations loc, dynamic raw) {
   switch (_parseStatus(raw)) {
     case kTournamentStatusRegistration:
-      return 'Registration Open';
+      return loc.tournamentRegistrationOpen;
     case kTournamentStatusActive:
-      return 'Active';
+      return loc.gameCardStatusInPlay;
     case kTournamentStatusFinished:
-      return 'Finished';
+      return loc.tournamentStatusFinished;
     case kTournamentStatusCancelled:
-      return 'Cancelled';
+      return loc.tournamentStatusCancelled;
     default:
-      return 'Unknown';
+      return loc.commonUnknown;
   }
 }
 
-/// The per-board status shown in a tournament's games list. Same
-/// not-yet-localized caveat as [_tournamentStatusLabel].
-String _gameStatusLabel(dynamic raw) {
+/// The per-board status shown in a tournament's games list. Same numeric
+/// codes and the same three states [GameCard] already renders for the
+/// lobby's own game list, so this reuses its keys outright rather than
+/// inventing a second "Finished" — both describe the same `Game.status`
+/// field, on the same noun, with no gender mismatch to work around.
+String _gameStatusLabel(AppLocalizations loc, dynamic raw) {
   switch (_parseStatus(raw)) {
     case kGameStatusLobby:
-      return 'Lobby';
+      return loc.gameCardStatusOpen;
     case kGameStatusActive:
-      return 'Active';
+      return loc.gameCardStatusInPlay;
     case kGameStatusFinished:
-      return 'Finished';
+      return loc.gameCardStatusFinished;
     default:
-      return 'Unknown';
+      return loc.commonUnknown;
   }
 }
 
@@ -171,7 +180,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                       StatusPill(
                         registrationOpen
                             ? loc.tournamentRegistrationOpen
-                            : _tournamentStatusLabel(status),
+                            : _tournamentStatusLabel(loc, status),
                         tone: registrationOpen
                             ? StatusTone.accent
                             : StatusTone.neutral,
@@ -220,7 +229,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                               loc.tournamentGameFallbackName(
                                   game['id'].toString()))
                           .toString(),
-                      subtitle: _gameStatusLabel(game['status']),
+                      subtitle: _gameStatusLabel(loc, game['status']),
                       icon: CupertinoIcons.map,
                       onTap: () => Navigator.push(
                         context,

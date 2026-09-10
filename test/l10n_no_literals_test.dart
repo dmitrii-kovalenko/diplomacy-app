@@ -1,13 +1,14 @@
 // Regression guard for T13 (l10n of the consent sheet, auth, settings,
-// account-linking and legal screens).
+// account-linking and legal screens), widened by T10/T12's finishing pass to
+// cover the board, chat and tournament screens those tickets converted.
 //
-// This intentionally checks only the files T13 converted, not the whole of
-// lib/screens/ and lib/widgets/: at the time this test was written, the
-// board (T10) and chat (T12) screens still carry hardcoded English literals
-// of their own. Sweeping the whole tree would fail this suite for
-// regressions in screens this ticket never touched. Once those tickets
-// convert their screens, widening `_scannedFiles` turns this into the
-// general guard the ticket originally asked for.
+// This originally checked only the files T13 converted: at the time it was
+// written, the board (T10) and chat (T12) screens still carried hardcoded
+// English literals of their own, and sweeping the whole tree would have
+// failed this suite for regressions in screens no ticket had touched yet.
+// Now that T10, T11, T12 and the tournament status labels (T24) have all
+// converted their screens, this is the general guard the ticket originally
+// asked for: every screen that carries player-facing copy is scanned.
 //
 // The match deliberately spans newlines. This codebase wraps anything long,
 // so the copy that started all of this — a German `subtitle:` on one line
@@ -17,8 +18,13 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// Files this ticket localized.
+/// Files converted by T10, T11, T12, T13 and the T24 status-label fix.
 const _scannedFiles = [
+  'lib/screens/lobby/lobby_screen.dart',
+  'lib/screens/lobby/create_game_screen.dart',
+  'lib/screens/lobby/create_sandbox_screen.dart',
+  'lib/screens/lobby/find_game_screen.dart',
+  'lib/widgets/game_card.dart',
   'lib/main.dart',
   'lib/screens/auth/login_screen.dart',
   'lib/screens/auth/register_screen.dart',
@@ -29,9 +35,19 @@ const _scannedFiles = [
   'lib/screens/legal/impressum_screen.dart',
   'lib/screens/legal/privacy_screen.dart',
   'lib/widgets/ui_kit.dart',
+  'lib/screens/game/game_screen.dart',
+  'lib/screens/game/preview_screen.dart',
+  'lib/screens/chat/conversations_screen.dart',
+  'lib/screens/chat/messages_screen.dart',
+  'lib/screens/tournament/tournament_screen.dart',
 ];
 
-/// Argument positions that carry player-facing copy in this codebase.
+/// Argument and statement positions that carry player-facing copy in this
+/// codebase. `return` catches the label-helper pattern used throughout the
+/// board and tournament screens (`_turnLabel`, `_tournamentStatusLabel`,
+/// `_gameStatusLabel`) — a getter or a function with no `BuildContext` in
+/// scope hands its caller a plain string, and that string is exactly as
+/// player-facing as a `Text(...)` argument, just one call removed from it.
 const _copyPositions = [
   'Text(',
   'title:',
@@ -47,6 +63,8 @@ const _copyPositions = [
   'confirmLabel:',
   'cancelLabel:',
   'showToast(context,',
+  'semanticsLabel:',
+  'return',
 ];
 
 /// Strings that sit in a copy position but are not translatable copy: the
@@ -77,7 +95,8 @@ final _literalPattern = RegExp(
 );
 
 void main() {
-  test('T13 screens have no hardcoded English copy left', () {
+  test('the board, chat, tournament and T13 screens have no hardcoded '
+      'English copy left', () {
     final violations = <String>[];
 
     for (final path in _scannedFiles) {

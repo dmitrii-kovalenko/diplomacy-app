@@ -111,6 +111,8 @@
   "gameCardStatusOpen": "Открыта",
   "gameCardStatusFinished": "Завершена",
   "gameCardStatusInPlay": "Идёт",
+  "tournamentStatusFinished": "Завершён",
+  "tournamentStatusCancelled": "Отменён",
   "consentTitle": "Настройки конфиденциальности",
   "consentSubtitle": "Вы решаете, какие данные мы обрабатываем. Вы можете изменить это в любое время в настройках.",
   "consentNecessaryTitle": "Обязательные",
@@ -195,5 +197,123 @@
   "legalPrivacySectionAnalytics": "4. Инструменты анализа (Firebase и Crashlytics)",
   "legalPrivacySectionE2ee": "5. Сквозное шифрование",
   "legalPrivacySectionRights": "6. Ваши права",
-  "commonCancel": "Отмена"
+  "commonCancel": "Отмена",
+  "commonUnknown": "Неизвестно",
+  "orderHold": "Оборона",
+  "orderMove": "Атака",
+  "orderSupport": "Поддержка",
+  "orderConvoy": "Конвой",
+  "orderBuild": "Построить",
+  "orderDisband": "Распустить",
+  "orderRetreat": "Отступить",
+  "unitArmy": "Армия",
+  "unitFleet": "Флот",
+  "gameSurrenderTitle": "Сдаться?",
+  "gameSurrenderMessage": "Ваши юниты останутся на карте и будут обороняться. Вернуться в эту партию будет нельзя.",
+  "gameSurrenderConfirm": "Сдаться",
+  "gameProposeDrawTitle": "Предложить ничью?",
+  "gameProposeDrawMessage": "Все ещё играющие голосуют. Партия закончится ничьей, только если согласятся все.",
+  "gameProposeDrawConfirm": "Предложить ничью",
+  "gameProposeDrawMenuItem": "Предложить ничью",
+  "gameDisbandUnitTitle": "Распустить этот юнит?",
+  "gameDisbandUnitMessage": "Он покинет карту до конца партии. Отменить это будет нельзя.",
+  "gameWhichCoast": "Какой берег {code}?",
+  "@gameWhichCoast": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "gameHistoryTitle": "История",
+  "gameViewHistory": "Просмотр истории",
+  "gameEarlierTurn": "Предыдущий ход",
+  "gameLaterTurn": "Следующий ход",
+  "gameBackToLiveBoard": "Назад к текущей партии",
+  "gameMyOrdersTooltip": "Мои приказы",
+  "gameMoreTooltip": "Ещё",
+  "gameOrdersDrawerTitle": "Приказы",
+  "gameNoOrdersYetTitle": "Приказов пока нет",
+  "gameNoOrdersYetMessage": "Нажмите на один из своих юнитов на карте, чтобы отдать приказ.",
+  "gameCancelOrderFailedToast": "Не удалось отменить приказ.",
+  "gameSubmitOrderFailedToast": "Не удалось отправить приказ.",
+  "gameCancelOrder": "Отменить приказ",
+  "gameCancelBuild": "Отменить постройку",
+  "gameCancelDisband": "Отменить распуск",
+  "gameCancelRetreat": "Отменить отступление",
+  "gamePendingOrderStatus": "В очереди: {orderType} в {province}",
+  "@gamePendingOrderStatus": {
+    "placeholders": {
+      "orderType": {
+        "type": "String"
+      },
+      "province": {
+        "type": "String"
+      }
+    }
+  },
+  "gameDrawBannerTitle": "Предложена ничья",
+  "gameDrawWaitingOnOthers": "Ждём остальные державы…",
+  "gameDrawEveryoneMustAccept": "Все оставшиеся державы должны согласиться.",
+  "gameDrawAccept": "Принять",
+  "gameDrawReject": "Отклонить",
+  "gameTargetPromptDefault": "Нажмите провинцию назначения",
+  "gameTargetPromptRetreat": "Нажмите соседнюю провинцию, куда отступить",
+  "gameTargetPromptSupportAux": "Нажмите на юнит, который поддерживаете",
+  "gameTargetPromptSupportTarget": "Нажмите провинцию назначения или кнопку «Поддержать оборону»",
+  "gameTargetPromptConvoyAux": "Нажмите на армию для конвоя",
+  "gameTargetPromptConvoyTarget": "Нажмите, куда конвоировать",
+  "gameSupportHold": "Поддержать оборону",
+  "gameReadyLabel": "Готов",
+  "gameNotReadyLabel": "Не готов",
+  "gameYourMoveLabel": "Ваш ход",
+  "gameOrderCountEmpty": "Нажмите на один из своих юнитов, чтобы отдать приказ",
+  "gameOrdersSubmitted": "{count, plural, =0{Приказов пока нет} one{{count} приказ принят} few{{count} приказа принято} many{{count} приказов принято} other{{count} приказов принято}}",
+  "@gameOrdersSubmitted": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "gameLoadErrorToast": "Не удалось загрузить игру.",
+  "gameHistoryLoadErrorToast": "Не удалось загрузить этот ход.",
+  "gameNoResolvedTurnsYet": "Прошлых ходов ещё нет.",
+  "gameLoadingBoard": "Загрузка карты…",
+  "gameLoadingHistory": "Загрузка истории…",
+  "gameCoastPickerUnavailableToast": "Этой провинции нужен берег, но выбор недоступен.",
+  "gamePreviewTitle": "Партия",
+  "gamePreviewUnavailableTitle": "Партия недоступна",
+  "gamePreviewUnavailableMessage": "Не удалось загрузить карту этой игры.",
+  "chatMessagesTitle": "Сообщения",
+  "chatNewConversationTitle": "Новая беседа",
+  "chatPickWhoIsAtTable": "Выберите, кто будет за столом переговоров. Все выбранные увидят каждое сообщение в этой беседе.",
+  "chatPickAtLeastOneCountry": "Выберите хотя бы одну страну",
+  "chatCouldNotLoadOtherCountries": "Не удалось загрузить список других стран.",
+  "chatNoOtherCountriesInGame": "В этой игре нет других стран.",
+  "chatStartChatWithCount": "{count, plural, one{Начать беседу с {count} страной} other{Начать беседу с {count} странами}}",
+  "@chatStartChatWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "chatCouldNotStartConversationToast": "Не удалось начать беседу. Попробуйте ещё раз.",
+  "chatConversationFallbackName": "Беседа",
+  "chatNoConversationsYetTitle": "Бесед пока нет",
+  "chatNoConversationsYetMessage": "Дипломатия выигрывается в кулуарах. Откройте канал с одной державой — или сразу с несколькими.",
+  "chatNoMessagesYet": "Сообщений пока нет",
+  "chatEncryptedMessagePreview": "Зашифрованное сообщение",
+  "chatVerifyEncryptionTitle": "Проверка шифрования",
+  "chatVerifyEncryptionDescription": "Сравните этот код с другой стороной вслух или по другому каналу связи. Совпадение означает, что между вами никого нет.",
+  "chatCopyButton": "Копировать",
+  "chatEndToEndEncryptedTapToVerify": "Сквозное шифрование (нажмите для проверки)",
+  "chatNothingSaidYetTitle": "Пока ничего не сказано",
+  "chatNothingSaidYetMessage": "Начните с предложения. Или лжи.",
+  "chatEncryptedCannotReadWithKey": "Зашифровано — не удается прочитать с помощью этого ключа",
+  "chatDecryptingEllipsis": "Расшифровка…",
+  "chatMessageHint": "Сообщение",
+  "chatSendMessageSemantic": "Отправить сообщение",
+  "chatCouldNotSendMessageToast": "Не удалось отправить сообщение. Попробуйте ещё раз."
 }

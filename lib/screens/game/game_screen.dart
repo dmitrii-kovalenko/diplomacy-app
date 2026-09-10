@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../blocs/game/order_bloc.dart';
@@ -75,7 +76,8 @@ class _GameScreenState extends State<GameScreen> {
       debugPrint('Failed to load game: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        showToast(context, 'MAP/GAME ERROR: $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.gameLoadErrorToast,
+            isError: true);
       }
     }
   }
@@ -87,12 +89,12 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _surrender() async {
+    final loc = AppLocalizations.of(context)!;
     final ok = await confirm(
       context,
-      title: 'Surrender?',
-      message:
-          'Your units stay on the board and hold. You cannot rejoin this game.',
-      confirmLabel: 'Surrender',
+      title: loc.gameSurrenderTitle,
+      message: loc.gameSurrenderMessage,
+      confirmLabel: loc.gameSurrenderConfirm,
       destructive: true,
     );
     if (!ok) return;
@@ -101,13 +103,12 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _proposeDraw() async {
+    final loc = AppLocalizations.of(context)!;
     final ok = await confirm(
       context,
-      title: 'Propose a draw?',
-      message:
-          'Everyone still playing votes. The game ends in a shared draw only '
-          'if they all accept.',
-      confirmLabel: 'Propose draw',
+      title: loc.gameProposeDrawTitle,
+      message: loc.gameProposeDrawMessage,
+      confirmLabel: loc.gameProposeDrawConfirm,
     );
     if (!ok) return;
     await _gameService.proposeDraw(widget.gameId);
@@ -136,7 +137,7 @@ class _GameScreenState extends State<GameScreen> {
         // already on screen) would make "View history" look like it did
         // nothing at all, so say so explicitly.
         setState(() => _isHistoryLoading = false);
-        showToast(context, 'No resolved turns yet.');
+        showToast(context, AppLocalizations.of(context)!.gameNoResolvedTurnsYet);
         return;
       }
       setState(() {
@@ -144,9 +145,11 @@ class _GameScreenState extends State<GameScreen> {
         _isHistoryLoading = false;
       });
     } catch (e) {
+      debugPrint('Failed to load history: $e');
       if (!mounted) return;
       setState(() => _isHistoryLoading = false);
-      showToast(context, 'History error: $e', isError: true);
+      showToast(context, AppLocalizations.of(context)!.gameHistoryLoadErrorToast,
+          isError: true);
     }
   }
 
@@ -162,11 +165,12 @@ class _GameScreenState extends State<GameScreen> {
   // confirmation at all. Shared by the retreat-phase and adjustment-phase
   // Disband chips.
   Future<void> _confirmDisband(BuildContext context, OrderBloc bloc) async {
+    final loc = AppLocalizations.of(context)!;
     final ok = await confirm(
       context,
-      title: 'Disband this unit?',
-      message: 'It leaves the board for the rest of the game. This cannot be undone.',
-      confirmLabel: 'Disband',
+      title: loc.gameDisbandUnitTitle,
+      message: loc.gameDisbandUnitMessage,
+      confirmLabel: loc.orderDisband,
       destructive: true,
     );
     if (!ok) return;
@@ -196,7 +200,7 @@ class _GameScreenState extends State<GameScreen> {
     await showAppSheet<void>(
       context,
       builder: (ctx) => AppSheet(
-        title: 'Which coast of $targetCode?',
+        title: AppLocalizations.of(ctx)!.gameWhichCoast(targetCode),
         child: Padding(
           padding: const EdgeInsets.only(top: AppSpacing.sm),
           child: InsetSection(
@@ -218,22 +222,29 @@ class _GameScreenState extends State<GameScreen> {
     return chosen;
   }
 
-  String get _turnLabel {
+  // season_name/kind_name arrive pre-translated from the server (see the
+  // comment below) — this method only needs a localizations object for its
+  // own fallback, so it takes one instead of a BuildContext.
+  String _turnLabel(AppLocalizations loc) {
     final phase = _gameState?['phase'];
-    if (phase == null) return 'Game ${widget.gameId}';
+    if (phase == null) return loc.tournamentGameFallbackName(widget.gameId);
     final year = phase['year'];
     // The API's field names are season_name / kind_name (game/api/
     // serializers.py:_serialize_game_state) — not *_display. Getting this
     // wrong silently falls through to the raw numeric codes instead of
     // erroring, which is exactly what shipped: "1902 · 1 · 1" instead of
-    // "1902 · Spring · Movement".
+    // "1902 · Spring · Movement". They are already server-translated into
+    // the player's language once T09 sends it — this screen never
+    // retranslates them client-side.
     final season = phase['season_name'] ?? phase['season'];
     final kind = phase['kind_name'] ?? phase['kind'];
     final parts = [year, season, kind]
         .where((p) => p != null && p.toString().isNotEmpty)
         .map((p) => p.toString())
         .toList();
-    return parts.isEmpty ? 'Game ${widget.gameId}' : parts.join(' · ');
+    return parts.isEmpty
+        ? loc.tournamentGameFallbackName(widget.gameId)
+        : parts.join(' · ');
   }
 
   // Mirrors the Mini App's renderHistoryBar label (assets/game/orders_ui.js:
@@ -493,9 +504,10 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
 
     if (_isLoading) {
-      return const Scaffold(body: AppLoader(label: 'Loading the board…'));
+      return Scaffold(body: AppLoader(label: loc.gameLoadingBoard));
     }
 
     final drawProposal = _gameState?['draw_proposal'];
@@ -515,8 +527,23 @@ class _GameScreenState extends State<GameScreen> {
         bloc = OrderBloc(
           widget.gameId,
           onOrderSubmitted: _loadGame,
-          onOrderError: (message) {
-            if (mounted) showToast(context, message, isError: true);
+          onOrderError: (kind, {detail}) {
+            if (!mounted) return;
+            final loc = AppLocalizations.of(context)!;
+            // The server's reason (game/api/orders.py, validation.py) is an
+            // English literal — on a crash, a raw exception class name — so it
+            // belongs in the log, and the player gets a message in their own
+            // language instead.
+            if (kind == OrderErrorKind.submitFailed) {
+              debugPrint('submitOrder failed: $detail');
+            }
+            final message = switch (kind) {
+              OrderErrorKind.cancelFailed => loc.gameCancelOrderFailedToast,
+              OrderErrorKind.coastPickerUnavailable =>
+                loc.gameCoastPickerUnavailableToast,
+              OrderErrorKind.submitFailed => loc.gameSubmitOrderFailedToast,
+            };
+            showToast(context, message, isError: true);
           },
           onCoastPrompt: (target, from) => _promptCoast(target, from, bloc),
         );
@@ -529,7 +556,7 @@ class _GameScreenState extends State<GameScreen> {
           title: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_isHistoryMode ? 'History' : _turnLabel,
+              Text(_isHistoryMode ? loc.gameHistoryTitle : _turnLabel(loc),
                   style: t.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
@@ -542,7 +569,7 @@ class _GameScreenState extends State<GameScreen> {
               ? [
                   IconButton(
                     icon: const Icon(CupertinoIcons.chevron_left),
-                    tooltip: 'Earlier turn',
+                    tooltip: loc.gameEarlierTurn,
                     onPressed: _historyPhase?['has_prev'] == true
                         ? () => _fetchHistory(
                             (_historyPhase!['offset'] as num).toInt() + 1)
@@ -550,7 +577,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   IconButton(
                     icon: const Icon(CupertinoIcons.chevron_right),
-                    tooltip: 'Later turn',
+                    tooltip: loc.gameLaterTurn,
                     onPressed: _historyPhase?['has_next'] == true
                         ? () => _fetchHistory(
                             (_historyPhase!['offset'] as num).toInt() - 1)
@@ -558,7 +585,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   IconButton(
                     icon: const Icon(CupertinoIcons.xmark),
-                    tooltip: 'Back to the live board',
+                    tooltip: loc.gameBackToLiveBoard,
                     onPressed: _exitHistory,
                   ),
                   const SizedBox(width: AppSpacing.xs),
@@ -566,7 +593,7 @@ class _GameScreenState extends State<GameScreen> {
               : [
                   IconButton(
                     icon: const Icon(CupertinoIcons.bubble_left_bubble_right),
-                    tooltip: 'Messages',
+                    tooltip: loc.chatMessagesTitle,
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -578,26 +605,27 @@ class _GameScreenState extends State<GameScreen> {
                   Builder(
                     builder: (ctx) => IconButton(
                       icon: const Icon(CupertinoIcons.list_bullet),
-                      tooltip: 'My orders',
+                      tooltip: loc.gameMyOrdersTooltip,
                       onPressed: () => Scaffold.of(ctx).openEndDrawer(),
                     ),
                   ),
                   PopupMenuButton<String>(
                     icon: const Icon(CupertinoIcons.ellipsis_circle),
-                    tooltip: 'More',
+                    tooltip: loc.gameMoreTooltip,
                     onSelected: (val) {
                       if (val == 'draw') _proposeDraw();
                       if (val == 'surrender') _surrender();
                       if (val == 'history') _fetchHistory(0);
                     },
                     itemBuilder: (_) => [
-                      const PopupMenuItem(
-                          value: 'history', child: Text('View history')),
-                      const PopupMenuItem(
-                          value: 'draw', child: Text('Propose a draw')),
+                      PopupMenuItem(
+                          value: 'history', child: Text(loc.gameViewHistory)),
+                      PopupMenuItem(
+                          value: 'draw',
+                          child: Text(loc.gameProposeDrawMenuItem)),
                       PopupMenuItem(
                         value: 'surrender',
-                        child: Text('Surrender',
+                        child: Text(loc.gameSurrenderConfirm,
                             style: TextStyle(color: c.red)),
                       ),
                     ],
@@ -673,8 +701,8 @@ class _GameScreenState extends State<GameScreen> {
                       child: IgnorePointer(
                         child: ColoredBox(
                           color: c.scrim,
-                          child: const Center(
-                            child: AppLoader(label: 'Loading history…'),
+                          child: Center(
+                            child: AppLoader(label: loc.gameLoadingHistory),
                           ),
                         ),
                       ),
@@ -715,6 +743,7 @@ class _GameScreenState extends State<GameScreen> {
           builder: (context) {
             final c = AppColors.of(context);
             final t = Theme.of(context).textTheme;
+            final loc = AppLocalizations.of(context)!;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -723,7 +752,7 @@ class _GameScreenState extends State<GameScreen> {
                       AppSpacing.xl, AppSpacing.gutter, AppSpacing.md),
                   child: Row(
                     children: [
-                      Text('Orders', style: t.displaySmall),
+                      Text(loc.gameOrdersDrawerTitle, style: t.displaySmall),
                       const SizedBox(width: AppSpacing.sm),
                       Text('${myOrders.length}',
                           style: t.displaySmall
@@ -733,12 +762,10 @@ class _GameScreenState extends State<GameScreen> {
                 ),
                 Expanded(
                   child: myOrders.isEmpty
-                      ? const AppEmptyState(
+                      ? AppEmptyState(
                           icon: CupertinoIcons.list_bullet,
-                          title: 'No orders yet',
-                          message:
-                              'Tap one of your units on the map to give it '
-                              'an order.',
+                          title: loc.gameNoOrdersYetTitle,
+                          message: loc.gameNoOrdersYetMessage,
                         )
                       : ListView(
                           padding: const EdgeInsets.only(
@@ -755,9 +782,12 @@ class _GameScreenState extends State<GameScreen> {
                                             order['id'].toString());
                                         _loadGame();
                                       } catch (e) {
+                                        debugPrint(
+                                            'Failed to cancel order: $e');
                                         if (context.mounted) {
-                                          showToast(context,
-                                              'Could not cancel that order.',
+                                          showToast(
+                                              context,
+                                              loc.gameCancelOrderFailedToast,
                                               isError: true);
                                         }
                                       }
@@ -829,7 +859,7 @@ class _OrderRow extends StatelessWidget {
           ),
           Semantics(
             button: true,
-            label: 'Cancel order',
+            label: AppLocalizations.of(context)!.gameCancelOrder,
             child: PressableScale(
               onTap: onDelete,
               child: SizedBox(
@@ -863,6 +893,7 @@ class _DrawBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -881,11 +912,11 @@ class _DrawBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('A draw has been proposed', style: t.titleSmall),
+                Text(loc.gameDrawBannerTitle, style: t.titleSmall),
                 Text(
                   hasVoted
-                      ? 'Waiting on the other powers…'
-                      : 'Every remaining power must accept.',
+                      ? loc.gameDrawWaitingOnOthers
+                      : loc.gameDrawEveryoneMustAccept,
                   style: t.bodySmall?.copyWith(color: c.labelSecondary),
                 ),
               ],
@@ -893,10 +924,10 @@ class _DrawBanner extends StatelessWidget {
           ),
           if (!hasVoted) ...[
             const SizedBox(width: AppSpacing.sm),
-            AppButton('Accept',
+            AppButton(loc.gameDrawAccept,
                 onPressed: onAccept, compact: true, expand: false),
             const SizedBox(width: AppSpacing.sm),
-            AppButton('Reject',
+            AppButton(loc.gameDrawReject,
                 onPressed: onReject,
                 style: AppButtonStyle.tinted,
                 compact: true,
@@ -955,7 +986,7 @@ class _CommandBar extends StatelessWidget {
         content = _targetPromptRow(context, c, t);
 
       case OrderState.idle:
-        content = _readyRow(c, t);
+        content = _readyRow(context, c, t);
     }
 
     return Container(
@@ -984,32 +1015,33 @@ class _CommandBar extends StatelessWidget {
   // five in one bar — mirrors orders_ui.js's onProvinceClick, which builds
   // a different button set per phase kind rather than one fixed row.
   Widget _actionsRow(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final actions = <Widget>[];
     switch (bloc.phaseKind) {
       case kPhaseRetreat:
-        actions.add(_Action('Retreat', CupertinoIcons.arrow_uturn_left,
+        actions.add(_Action(loc.orderRetreat, CupertinoIcons.arrow_uturn_left,
             () => bloc.setAction(ActionType.retreat)));
         actions.add(_Action(
-            'Disband', CupertinoIcons.xmark_circle, onConfirmDisband));
+            loc.orderDisband, CupertinoIcons.xmark_circle, onConfirmDisband));
       case kPhaseAdjustment:
         // Only reached when quota < 0 tapped an own unit — build candidates
         // go through OrderState.buildChoice instead.
         actions.add(_Action(
-            'Disband', CupertinoIcons.xmark_circle, onConfirmDisband));
+            loc.orderDisband, CupertinoIcons.xmark_circle, onConfirmDisband));
       default:
-        actions.add(_Action('Hold', CupertinoIcons.shield,
+        actions.add(_Action(loc.orderHold, CupertinoIcons.shield,
             () => bloc.setAction(ActionType.hold)));
-        actions.add(_Action('Move', CupertinoIcons.arrow_right,
+        actions.add(_Action(loc.orderMove, CupertinoIcons.arrow_right,
             () => bloc.setAction(ActionType.move)));
         // Hide Support/Convoy outright when there is nothing they could
         // legally do — orders_ui.js drops the button rather than opening a
         // menu that can only ever be backed out of.
         if (bloc.canSupport) {
-          actions.add(_Action('Support', CupertinoIcons.arrow_branch,
+          actions.add(_Action(loc.orderSupport, CupertinoIcons.arrow_branch,
               () => bloc.setAction(ActionType.support)));
         }
         if (bloc.canConvoy) {
-          actions.add(_Action('Convoy', CupertinoIcons.location_north_fill,
+          actions.add(_Action(loc.orderConvoy, CupertinoIcons.location_north_fill,
               () => bloc.setAction(ActionType.convoy)));
         }
     }
@@ -1032,12 +1064,13 @@ class _CommandBar extends StatelessWidget {
   // Adjustment build menu: Army always, Fleet only at a port — mirrors
   // orders_ui.js's showBuildButtons(code, isPort).
   Widget _buildChoiceRow(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final actions = <Widget>[
-      _Action('Army', CupertinoIcons.person_fill,
+      _Action(loc.unitArmy, CupertinoIcons.person_fill,
           () => bloc.setAction(ActionType.buildArmy)),
     ];
     if (bloc.selectedScIsPort) {
-      actions.add(_Action('Fleet', CupertinoIcons.location_north_fill,
+      actions.add(_Action(loc.unitFleet, CupertinoIcons.location_north_fill,
           () => bloc.setAction(ActionType.buildFleet)));
     }
     return Row(
@@ -1060,19 +1093,22 @@ class _CommandBar extends StatelessWidget {
   // dialog on top of it (orders_ui.js's existingBuild/existingDisband/
   // existingOrder checks in onProvinceClick).
   Widget _pendingCancelRow(BuildContext context, AppColors c, TextTheme t) {
+    final loc = AppLocalizations.of(context)!;
     final order = bloc.pendingOrder;
     final type = (order?['order_type'] as num?)?.toInt();
-    String label = 'Cancel order';
-    if (type == kOrderBuild) label = 'Cancel build';
-    if (type == kOrderDisband) label = 'Cancel disband';
-    if (type == kOrderRetreat) label = 'Cancel retreat';
+    String label = loc.gameCancelOrder;
+    if (type == kOrderBuild) label = loc.gameCancelBuild;
+    if (type == kOrderDisband) label = loc.gameCancelDisband;
+    if (type == kOrderRetreat) label = loc.gameCancelRetreat;
 
     return Row(
       key: const ValueKey('pending-cancel'),
       children: [
         Expanded(
           child: Text(
-            'Pending: ${order?['order_type_name'] ?? label} at ${bloc.selectedProvince ?? ''}',
+            loc.gamePendingOrderStatus(
+                (order?['order_type_name'] as String?) ?? label,
+                bloc.selectedProvince ?? ''),
             style: t.bodyLarge,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1099,20 +1135,21 @@ class _CommandBar extends StatelessWidget {
   // canHoldSupport button, which exists because a tap on the aux province
   // itself is deliberately ignored (see OrderBloc._onSupportTargetTap).
   Widget _targetPromptRow(BuildContext context, AppColors c, TextTheme t) {
+    final loc = AppLocalizations.of(context)!;
     String hint;
     switch (bloc.currentState) {
       case OrderState.retreatTarget:
-        hint = 'Tap an adjacent province to retreat there';
+        hint = loc.gameTargetPromptRetreat;
       case OrderState.supportAux:
-        hint = 'Tap the unit you support';
+        hint = loc.gameTargetPromptSupportAux;
       case OrderState.supportTarget:
-        hint = "Tap the destination, or use \"Support hold\"";
+        hint = loc.gameTargetPromptSupportTarget;
       case OrderState.convoyAux:
-        hint = 'Tap the army to convoy';
+        hint = loc.gameTargetPromptConvoyAux;
       case OrderState.convoyTarget:
-        hint = 'Tap the convoy destination';
+        hint = loc.gameTargetPromptConvoyTarget;
       default:
-        hint = 'Tap the destination province';
+        hint = loc.gameTargetPromptDefault;
     }
 
     return Row(
@@ -1123,7 +1160,7 @@ class _CommandBar extends StatelessWidget {
         Expanded(child: Text(hint, style: t.bodyLarge)),
         if (bloc.currentState == OrderState.supportTarget && bloc.canSupportHold) ...[
           AppButton(
-            'Support hold',
+            loc.gameSupportHold,
             onPressed: bloc.supportHold,
             style: AppButtonStyle.tinted,
             compact: true,
@@ -1136,7 +1173,8 @@ class _CommandBar extends StatelessWidget {
     );
   }
 
-  Widget _readyRow(AppColors c, TextTheme t) {
+  Widget _readyRow(BuildContext context, AppColors c, TextTheme t) {
+    final loc = AppLocalizations.of(context)!;
     return Row(
       key: const ValueKey('ready'),
       children: [
@@ -1146,14 +1184,14 @@ class _CommandBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isReady ? 'Ready' : 'Your move',
+                isReady ? loc.gameReadyLabel : loc.gameYourMoveLabel,
                 style: t.titleSmall
                     ?.copyWith(color: isReady ? c.green : c.labelPrimary),
               ),
               Text(
                 orderCount == 0
-                    ? 'Tap one of your units to give it an order'
-                    : '$orderCount order${orderCount == 1 ? '' : 's'} submitted',
+                    ? loc.gameOrderCountEmpty
+                    : loc.gameOrdersSubmitted(orderCount),
                 style: t.bodySmall?.copyWith(color: c.labelSecondary),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1163,7 +1201,7 @@ class _CommandBar extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         AppButton(
-          isReady ? 'Not ready' : 'Ready',
+          isReady ? loc.gameNotReadyLabel : loc.gameReadyLabel,
           icon: isReady ? null : CupertinoIcons.check_mark,
           style: isReady ? AppButtonStyle.tinted : AppButtonStyle.filled,
           onPressed: onToggleReady,
@@ -1223,7 +1261,7 @@ class _CancelButton extends StatelessWidget {
     final c = AppColors.of(context);
     return Semantics(
       button: true,
-      label: 'Cancel',
+      label: AppLocalizations.of(context)!.commonCancel,
       child: PressableScale(
         onTap: onTap,
         child: Container(

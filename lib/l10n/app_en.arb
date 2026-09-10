@@ -111,6 +111,8 @@
   "gameCardStatusOpen": "Open",
   "gameCardStatusFinished": "Finished",
   "gameCardStatusInPlay": "In play",
+  "tournamentStatusFinished": "Finished",
+  "tournamentStatusCancelled": "Cancelled",
   "consentTitle": "Privacy Settings",
   "consentSubtitle": "You decide which data we process. You can change this at any time in the settings.",
   "consentNecessaryTitle": "Necessary",
@@ -195,5 +197,123 @@
   "legalPrivacySectionAnalytics": "4. Analysis Tools (Firebase & Crashlytics)",
   "legalPrivacySectionE2ee": "5. End-to-End Encryption",
   "legalPrivacySectionRights": "6. Your Rights",
-  "commonCancel": "Cancel"
+  "commonCancel": "Cancel",
+  "commonUnknown": "Unknown",
+  "orderHold": "Hold",
+  "orderMove": "Move",
+  "orderSupport": "Support",
+  "orderConvoy": "Convoy",
+  "orderBuild": "Build",
+  "orderDisband": "Disband",
+  "orderRetreat": "Retreat",
+  "unitArmy": "Army",
+  "unitFleet": "Fleet",
+  "gameSurrenderTitle": "Surrender?",
+  "gameSurrenderMessage": "Your units stay on the board and hold. You cannot rejoin this game.",
+  "gameSurrenderConfirm": "Surrender",
+  "gameProposeDrawTitle": "Propose a draw?",
+  "gameProposeDrawMessage": "Everyone still playing votes. The game ends in a shared draw only if they all accept.",
+  "gameProposeDrawConfirm": "Propose draw",
+  "gameProposeDrawMenuItem": "Propose a draw",
+  "gameDisbandUnitTitle": "Disband this unit?",
+  "gameDisbandUnitMessage": "It leaves the board for the rest of the game. This cannot be undone.",
+  "gameWhichCoast": "Which coast of {code}?",
+  "@gameWhichCoast": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "gameHistoryTitle": "History",
+  "gameViewHistory": "View history",
+  "gameEarlierTurn": "Earlier turn",
+  "gameLaterTurn": "Later turn",
+  "gameBackToLiveBoard": "Back to the live board",
+  "gameMyOrdersTooltip": "My orders",
+  "gameMoreTooltip": "More",
+  "gameOrdersDrawerTitle": "Orders",
+  "gameNoOrdersYetTitle": "No orders yet",
+  "gameNoOrdersYetMessage": "Tap one of your units on the map to give it an order.",
+  "gameCancelOrderFailedToast": "Could not cancel that order.",
+  "gameSubmitOrderFailedToast": "Could not submit that order.",
+  "gameCancelOrder": "Cancel order",
+  "gameCancelBuild": "Cancel build",
+  "gameCancelDisband": "Cancel disband",
+  "gameCancelRetreat": "Cancel retreat",
+  "gamePendingOrderStatus": "Pending: {orderType} at {province}",
+  "@gamePendingOrderStatus": {
+    "placeholders": {
+      "orderType": {
+        "type": "String"
+      },
+      "province": {
+        "type": "String"
+      }
+    }
+  },
+  "gameDrawBannerTitle": "A draw has been proposed",
+  "gameDrawWaitingOnOthers": "Waiting on the other powers…",
+  "gameDrawEveryoneMustAccept": "Every remaining power must accept.",
+  "gameDrawAccept": "Accept",
+  "gameDrawReject": "Reject",
+  "gameTargetPromptDefault": "Tap the destination province",
+  "gameTargetPromptRetreat": "Tap an adjacent province to retreat there",
+  "gameTargetPromptSupportAux": "Tap the unit you support",
+  "gameTargetPromptSupportTarget": "Tap the destination, or use \"Support hold\"",
+  "gameTargetPromptConvoyAux": "Tap the army to convoy",
+  "gameTargetPromptConvoyTarget": "Tap the convoy destination",
+  "gameSupportHold": "Support hold",
+  "gameReadyLabel": "Ready",
+  "gameNotReadyLabel": "Not ready",
+  "gameYourMoveLabel": "Your move",
+  "gameOrderCountEmpty": "Tap one of your units to give it an order",
+  "gameOrdersSubmitted": "{count, plural, =0{No orders yet} one{{count} order submitted} other{{count} orders submitted}}",
+  "@gameOrdersSubmitted": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "gameLoadErrorToast": "Could not load the game.",
+  "gameHistoryLoadErrorToast": "Could not load that turn.",
+  "gameNoResolvedTurnsYet": "No resolved turns yet.",
+  "gameLoadingBoard": "Loading the board…",
+  "gameLoadingHistory": "Loading history…",
+  "gameCoastPickerUnavailableToast": "This province needs a coast, but no picker is available.",
+  "gamePreviewTitle": "Board",
+  "gamePreviewUnavailableTitle": "Board unavailable",
+  "gamePreviewUnavailableMessage": "The map for this game could not be loaded.",
+  "chatMessagesTitle": "Messages",
+  "chatNewConversationTitle": "New conversation",
+  "chatPickWhoIsAtTable": "Pick who is at the table. Everyone selected sees every message in this thread.",
+  "chatPickAtLeastOneCountry": "Pick at least one country",
+  "chatCouldNotLoadOtherCountries": "Could not load the other countries.",
+  "chatNoOtherCountriesInGame": "No other countries in this game.",
+  "chatStartChatWithCount": "{count, plural, one{Start chat with {count}} other{Start chat with {count}}}",
+  "@chatStartChatWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "chatCouldNotStartConversationToast": "Could not start that conversation. Try again.",
+  "chatConversationFallbackName": "Conversation",
+  "chatNoConversationsYetTitle": "No conversations yet",
+  "chatNoConversationsYetMessage": "Diplomacy is won in private. Open a channel with one power — or several.",
+  "chatNoMessagesYet": "No messages yet",
+  "chatEncryptedMessagePreview": "Encrypted message",
+  "chatVerifyEncryptionTitle": "Verify encryption",
+  "chatVerifyEncryptionDescription": "Compare this code with the other side, out loud or on another channel. A match means no one is between you.",
+  "chatCopyButton": "Copy",
+  "chatEndToEndEncryptedTapToVerify": "End-to-end encrypted (tap to verify)",
+  "chatNothingSaidYetTitle": "Nothing said yet",
+  "chatNothingSaidYetMessage": "Open with an offer. Or a lie.",
+  "chatEncryptedCannotReadWithKey": "Encrypted — can't read with this key",
+  "chatDecryptingEllipsis": "Decrypting…",
+  "chatMessageHint": "Message",
+  "chatSendMessageSemantic": "Send message",
+  "chatCouldNotSendMessageToast": "Could not send that message. Try again."
 }

@@ -111,6 +111,8 @@
   "gameCardStatusOpen": "Offen",
   "gameCardStatusFinished": "Beendet",
   "gameCardStatusInPlay": "Läuft",
+  "tournamentStatusFinished": "Beendet",
+  "tournamentStatusCancelled": "Abgesagt",
   "consentTitle": "Datenschutzeinstellungen",
   "consentSubtitle": "Sie entscheiden, welche Daten wir verarbeiten. Sie können dies jederzeit in den Einstellungen ändern.",
   "consentNecessaryTitle": "Notwendig",
@@ -195,5 +197,123 @@
   "legalPrivacySectionAnalytics": "4. Analysetools (Firebase & Crashlytics)",
   "legalPrivacySectionE2ee": "5. Ende-zu-Ende-Verschlüsselung",
   "legalPrivacySectionRights": "6. Ihre Rechte",
-  "commonCancel": "Abbrechen"
+  "commonCancel": "Abbrechen",
+  "commonUnknown": "Unbekannt",
+  "orderHold": "Verteidigung",
+  "orderMove": "Angriff",
+  "orderSupport": "Unterstützen",
+  "orderConvoy": "Konvoi",
+  "orderBuild": "Bauen",
+  "orderDisband": "Auflösen",
+  "orderRetreat": "Rückzug",
+  "unitArmy": "Armee",
+  "unitFleet": "Flotte",
+  "gameSurrenderTitle": "Aufgeben?",
+  "gameSurrenderMessage": "Ihre Einheiten bleiben auf der Karte und verteidigen sich. Sie können dieser Partie nicht wieder beitreten.",
+  "gameSurrenderConfirm": "Aufgeben",
+  "gameProposeDrawTitle": "Remis vorschlagen?",
+  "gameProposeDrawMessage": "Alle noch spielenden Mächte stimmen ab. Die Partie endet nur dann in einem gemeinsamen Remis, wenn alle zustimmen.",
+  "gameProposeDrawConfirm": "Remis vorschlagen",
+  "gameProposeDrawMenuItem": "Remis vorschlagen",
+  "gameDisbandUnitTitle": "Diese Einheit auflösen?",
+  "gameDisbandUnitMessage": "Sie verlässt die Karte für den Rest der Partie. Dies kann nicht rückgängig gemacht werden.",
+  "gameWhichCoast": "Welche Küste von {code}?",
+  "@gameWhichCoast": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "gameHistoryTitle": "Verlauf",
+  "gameViewHistory": "Verlauf ansehen",
+  "gameEarlierTurn": "Vorheriger Zug",
+  "gameLaterTurn": "Nächster Zug",
+  "gameBackToLiveBoard": "Zurück zur aktuellen Partie",
+  "gameMyOrdersTooltip": "Meine Befehle",
+  "gameMoreTooltip": "Mehr",
+  "gameOrdersDrawerTitle": "Befehle",
+  "gameNoOrdersYetTitle": "Noch keine Befehle",
+  "gameNoOrdersYetMessage": "Tippen Sie auf eine Ihrer Einheiten auf der Karte, um einen Befehl zu geben.",
+  "gameCancelOrderFailedToast": "Der Befehl konnte nicht abgebrochen werden.",
+  "gameSubmitOrderFailedToast": "Der Befehl konnte nicht abgesendet werden.",
+  "gameCancelOrder": "Befehl abbrechen",
+  "gameCancelBuild": "Aufbau abbrechen",
+  "gameCancelDisband": "Auflösung abbrechen",
+  "gameCancelRetreat": "Rückzug abbrechen",
+  "gamePendingOrderStatus": "Ausstehend: {orderType} in {province}",
+  "@gamePendingOrderStatus": {
+    "placeholders": {
+      "orderType": {
+        "type": "String"
+      },
+      "province": {
+        "type": "String"
+      }
+    }
+  },
+  "gameDrawBannerTitle": "Remis vorgeschlagen",
+  "gameDrawWaitingOnOthers": "Warten auf die übrigen Mächte…",
+  "gameDrawEveryoneMustAccept": "Alle verbleibenden Mächte müssen zustimmen.",
+  "gameDrawAccept": "Annehmen",
+  "gameDrawReject": "Ablehnen",
+  "gameTargetPromptDefault": "Zielprovinz antippen",
+  "gameTargetPromptRetreat": "Tippen Sie auf eine Nachbarprovinz für den Rückzug",
+  "gameTargetPromptSupportAux": "Tippen Sie auf die unterstützte Einheit",
+  "gameTargetPromptSupportTarget": "Zielprovinz antippen oder den Knopf „Halten unterstützen“ verwenden.",
+  "gameTargetPromptConvoyAux": "Tippen Sie auf die zu transportierende Armee",
+  "gameTargetPromptConvoyTarget": "Konvoi-Ziel antippen",
+  "gameSupportHold": "Halten unterstützen",
+  "gameReadyLabel": "Bereit",
+  "gameNotReadyLabel": "Nicht bereit",
+  "gameYourMoveLabel": "Ihr Zug",
+  "gameOrderCountEmpty": "Tippen Sie auf eine Ihrer Einheiten, um einen Befehl zu geben",
+  "gameOrdersSubmitted": "{count, plural, =0{Noch keine Befehle} one{{count} Befehl erteilt} other{{count} Befehle erteilt}}",
+  "@gameOrdersSubmitted": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "gameLoadErrorToast": "Die Partie konnte nicht geladen werden.",
+  "gameHistoryLoadErrorToast": "Dieser Zug konnte nicht geladen werden.",
+  "gameNoResolvedTurnsYet": "Noch kein vorheriger Zug.",
+  "gameLoadingBoard": "Karte wird geladen…",
+  "gameLoadingHistory": "Verlauf wird geladen…",
+  "gameCoastPickerUnavailableToast": "Diese Provinz benötigt eine Küste, aber die Auswahl ist nicht verfügbar.",
+  "gamePreviewTitle": "Partie",
+  "gamePreviewUnavailableTitle": "Partie nicht verfügbar",
+  "gamePreviewUnavailableMessage": "Die Karte für diese Partie konnte nicht geladen werden.",
+  "chatMessagesTitle": "Nachrichten",
+  "chatNewConversationTitle": "Neues Gespräch",
+  "chatPickWhoIsAtTable": "Wählen Sie aus, wer am Tisch sitzt. Alle Ausgewählten sehen jede Nachricht in diesem Gespräch.",
+  "chatPickAtLeastOneCountry": "Wählen Sie mindestens ein Land",
+  "chatCouldNotLoadOtherCountries": "Die anderen Länder konnten nicht geladen werden.",
+  "chatNoOtherCountriesInGame": "Keine anderen Länder in dieser Partie.",
+  "chatStartChatWithCount": "{count, plural, one{Chat mit {count} Land beginnen} other{Chat mit {count} Ländern beginnen}}",
+  "@chatStartChatWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "chatCouldNotStartConversationToast": "Das Gespräch konnte nicht gestartet werden. Versuchen Sie es erneut.",
+  "chatConversationFallbackName": "Gespräch",
+  "chatNoConversationsYetTitle": "Noch keine Gespräche",
+  "chatNoConversationsYetMessage": "Diplomatie wird im Verborgenen gewonnen. Öffnen Sie einen Kanal mit einer Macht — oder mit mehreren.",
+  "chatNoMessagesYet": "Noch keine Nachrichten",
+  "chatEncryptedMessagePreview": "Verschlüsselte Nachricht",
+  "chatVerifyEncryptionTitle": "Verschlüsselung überprüfen",
+  "chatVerifyEncryptionDescription": "Vergleichen Sie diesen Code mit der Gegenseite, laut oder über einen anderen Kanal. Eine Übereinstimmung bedeutet, dass niemand zwischen Ihnen steht.",
+  "chatCopyButton": "Kopieren",
+  "chatEndToEndEncryptedTapToVerify": "Ende-zu-Ende-verschlüsselt (zum Prüfen tippen)",
+  "chatNothingSaidYetTitle": "Noch nichts gesagt",
+  "chatNothingSaidYetMessage": "Beginnen Sie mit einem Angebot. Oder einer Lüge.",
+  "chatEncryptedCannotReadWithKey": "Verschlüsselt — kann mit diesem Schlüssel nicht lesen",
+  "chatDecryptingEllipsis": "Entschlüsselung…",
+  "chatMessageHint": "Nachricht",
+  "chatSendMessageSemantic": "Nachricht senden",
+  "chatCouldNotSendMessageToast": "Die Nachricht konnte nicht gesendet werden. Versuchen Sie es erneut."
 }
