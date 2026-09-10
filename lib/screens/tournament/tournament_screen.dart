@@ -7,6 +7,64 @@ import '../../theme/app_theme.dart';
 import '../../widgets/ui_kit.dart';
 import '../game/game_screen.dart';
 
+// Numeric codes mirroring DjangoProject/game/models.py's
+// TOURNAMENT_STATUS_CHOICES — the tournament API sends this integer as
+// `status`, never the display name, so match against these rather than a
+// string. Keep this block in sync with models.py by hand; there is no
+// generated bridge between the two languages.
+const int kTournamentStatusRegistration = 0;
+const int kTournamentStatusActive = 1;
+const int kTournamentStatusFinished = 2;
+const int kTournamentStatusCancelled = 3;
+
+// Numeric codes mirroring DjangoProject/game/choices.py's
+// GAME_STATUS_CHOICES — the per-board `status` in a tournament's games list
+// is this same raw integer, with no display-name counterpart in the API.
+const int kGameStatusLobby = 0;
+const int kGameStatusActive = 1;
+const int kGameStatusFinished = 2;
+
+/// Parses a status value the API may send as an int or (defensively) as a
+/// numeric string, returning null for anything unrecognized.
+int? _parseStatus(dynamic raw) =>
+    raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+
+/// The tournament status pill's label.
+///
+/// Plain English on purpose, not an [AppLocalizations] lookup: the ARB
+/// files are owned by a concurrent localization pass at the time of this
+/// fix, so these words are left for that sweep to convert into proper
+/// translation keys rather than added here as a fourth language file edit.
+String _tournamentStatusLabel(dynamic raw) {
+  switch (_parseStatus(raw)) {
+    case kTournamentStatusRegistration:
+      return 'Registration Open';
+    case kTournamentStatusActive:
+      return 'Active';
+    case kTournamentStatusFinished:
+      return 'Finished';
+    case kTournamentStatusCancelled:
+      return 'Cancelled';
+    default:
+      return 'Unknown';
+  }
+}
+
+/// The per-board status shown in a tournament's games list. Same
+/// not-yet-localized caveat as [_tournamentStatusLabel].
+String _gameStatusLabel(dynamic raw) {
+  switch (_parseStatus(raw)) {
+    case kGameStatusLobby:
+      return 'Lobby';
+    case kGameStatusActive:
+      return 'Active';
+    case kGameStatusFinished:
+      return 'Finished';
+    default:
+      return 'Unknown';
+  }
+}
+
 /// A tournament: what it is, where you stand, and the games it has produced.
 /// Registration state is a pill, not a paragraph, and the call to action only
 /// appears while it can actually be taken.
@@ -85,11 +143,11 @@ class _TournamentScreenState extends State<TournamentScreen> {
 
     final name = (_tournament!['name'] ?? loc.tournamentTitle).toString();
     final description = (_tournament!['description'] ?? '').toString();
-    final status = (_tournament!['status'] ?? 'UNKNOWN').toString();
+    final status = _tournament!['status'];
     final isRegistered = _tournament!['is_registered'] == true;
     final games = (_tournament!['games'] ?? []) as List;
     final registrationOpen =
-        status == 'REGISTRATION' || status == 'Registration Open';
+        _parseStatus(status) == kTournamentStatusRegistration;
 
     return Scaffold(
       body: CustomScrollView(
@@ -113,7 +171,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                       StatusPill(
                         registrationOpen
                             ? loc.tournamentRegistrationOpen
-                            : status,
+                            : _tournamentStatusLabel(status),
                         tone: registrationOpen
                             ? StatusTone.accent
                             : StatusTone.neutral,
@@ -162,7 +220,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                               loc.tournamentGameFallbackName(
                                   game['id'].toString()))
                           .toString(),
-                      subtitle: game['status']?.toString(),
+                      subtitle: _gameStatusLabel(game['status']),
                       icon: CupertinoIcons.map,
                       onTap: () => Navigator.push(
                         context,
