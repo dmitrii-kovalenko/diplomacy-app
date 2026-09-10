@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:xml/xml.dart';
 import 'package:path_drawing/path_drawing.dart';
 import 'order_arrows.dart';
@@ -37,6 +38,127 @@ class NeutralShape {
   NeutralShape(this.path, this.fill, this.stroke, this.strokeWidth);
 }
 
+/// One province-code label baked into the SVG's `g#labels`: the code, the
+/// position the map author drew it at, and its class (`lbl-sea` / `lbl-land`
+/// — the sea/land distinction has no DB equivalent, so the SVG is the only
+/// source for it). `MapPainter` overrides the position with
+/// `labelPositions[code]` when the DB has moved it, the same precedence
+/// `applyLabelPositions` uses in the Mini App, but always keeps the class.
+///
+/// Kept as a list, not a `Map<String, MapLabel>`: a split-coast province can
+/// carry two `<text>` nodes sharing one code, and a map keyed by code would
+/// silently drop one of them.
+class MapLabel {
+  final String code;
+  final Offset position;
+  final String cssClass;
+
+  const MapLabel({required this.code, required this.position, required this.cssClass});
+}
+
+/// Cartography ink for a province-code label, mirroring the `.lbl-sea` /
+/// `.lbl-land` rules every shipped map's `<style>` block defines. This is the
+/// map author's ink, not UI chrome, so — like `_neutralStyles` and the
+/// supply-centre red below — it deliberately does not live in `AppColors`.
+const Map<String, TextStyle> _labelStyles = {
+  'lbl-sea': TextStyle(color: Color(0xFF1A4A6A), fontSize: 11, fontStyle: FontStyle.italic, fontFamily: 'serif'),
+  'lbl-land': TextStyle(color: Color(0xFF222222), fontSize: 11, fontWeight: FontWeight.bold),
+};
+
+/// One unit already resolved from a province code to what the painter needs
+/// to draw it: its own screen position (unit_x/unit_y, the label+16
+/// fallback, or a coast-specific position — all the caller's job, since only
+/// the caller knows province codes), which icon to pick, its owner's colour,
+/// and whether it is mid-retreat.
+///
+/// Distinct from [MapViewer.unitPositions]/[MapViewer.unitColors] — the flat
+/// maps every caller still passes today. Those carry no type or dislodged
+/// state at all, which is exactly T04's problem, so [MapPainter] only draws
+/// real army/fleet icons once a caller supplies this list; until
+/// `game_screen.dart`/`preview_screen.dart` are wired to build one, it keeps
+/// drawing the old flat dot from the flat maps below rather than guess a
+/// shape from data that was never sent.
+class MapUnit {
+  final String province;
+
+  /// 'army' or 'fleet'; anything else is treated as an army so a payload
+  /// with an unrecognised value still gets *a* shape.
+  final String type;
+  final Offset position;
+  final Color color;
+  final bool isDislodged;
+
+  const MapUnit({
+    required this.province,
+    required this.type,
+    required this.position,
+    required this.color,
+    this.isDislodged = false,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapUnit &&
+      other.province == province &&
+      other.type == type &&
+      other.position == position &&
+      other.color == color &&
+      other.isDislodged == isDislodged;
+
+  @override
+  int get hashCode => Object.hash(province, type, position, color, isDislodged);
+}
+
+/// One army/fleet icon's paths, parsed once per map from the bundled
+/// `assets/maps/units/<kind>_<suffix>.svg` — mirrors the Mini App's
+/// `loadUnitIcons`/`makeUnitGroup`. `filled` mirrors the source SVG's own
+/// `class="fill"` (painted in the empire colour, with a dark outline) versus
+/// `class="stroke"` (outline-only linework); together they turn a flat
+/// two-tone icon into the layered look the source art is authored with.
+class UnitIcon {
+  final Size viewBox;
+  final List<(Path path, bool filled)> paths;
+
+  const UnitIcon(this.viewBox, this.paths);
+}
+
+/// Per-map unit icon suffix, keyed by the SVG's own untranslated basename
+/// (e.g. `diplomacy_classic`) rather than `map.js`'s `guessUnitSuffix`, which
+/// keys off the *English* map name. `game/api/serializers.py` sends that name
+/// untranslated for a live game but translated for a preview (T04's risk
+/// note), so keying off the SVG basename — always untranslated, since
+/// `_map_svg_url` always builds it from the file name — is the one lookup
+/// that works for both. A slug this table doesn't recognise falls back to
+/// itself with underscores stripped, then to `classic` if that file doesn't
+/// exist either (`_tryLoadUnitIcon`).
+const Map<String, String> _unitIconSuffixByMapSlug = {
+  'diplomacy_classic': 'classic',
+  'cold_war': 'coldwar',
+  'ancient_med': 'ancientmed',
+  'hundred': 'hundred',
+  'canton': 'canton',
+  'known_world_901': 'knownworld901',
+  'south_america': 'southamerica',
+  'north_america': 'northamerica',
+};
+
+/// Target icon size in SVG (map) pixels, ported from `map.js`'s
+/// `UNIT_SIZES` and keyed the same way as the suffix table above. Ranges
+/// from 22px (Known World 901, 269 provinces) to 50px (Hundred Years War) —
+/// a fixed size swamps the small maps and vanishes on the big one.
+const Map<String, double> _unitIconSizeByMapSlug = {
+  'diplomacy_classic': 44,
+  'europe_duel': 44,
+  'europe_extended': 44,
+  'cold_war': 44,
+  'ancient_med': 44,
+  'hundred': 50,
+  'canton': 36,
+  'known_world_901': 22,
+  'north_america': 33,
+  'south_america': 44,
+};
+
 /// Fill/stroke/width for each class used in `<g id="neutral">`, the root
 /// `<rect>` backdrop and `<g id="provinces">`, copied from the `<style>`
 /// block every shipped map SVG defines identically. This mirrors the SVG's
@@ -62,6 +184,20 @@ class MapViewer extends StatefulWidget {
   /// ownership, and a unit can sit in a province that isn't one, or that a
   /// different empire currently holds the *center* of.
   final Map<String, Color> unitColors;
+
+  /// Units ready to draw as real army/fleet tokens, with position, type,
+  /// colour and dislodged state already resolved by the caller. See
+  /// [MapUnit] for why this is a separate list rather than more flat maps.
+  final List<MapUnit> units;
+
+  /// The untranslated SVG basename (e.g. `diplomacy_classic`) — used only to
+  /// pick the right per-map unit icon set and size (see
+  /// `_unitIconSuffixByMapSlug`/`_unitIconSizeByMapSlug`). Deliberately not
+  /// the payload's `map_name`: that field is translated on the preview
+  /// endpoint but not the live one, so keying icon lookup off it would
+  /// silently fall back to `classic` for every non-English preview.
+  final String? mapSlug;
+
   final List<Order> orders;
   final Function(String) onProvinceTapped;
   final Function(Map<String, ProvinceData>)? onSvgParsed;
@@ -77,6 +213,8 @@ class MapViewer extends StatefulWidget {
     this.scPositions = const {},
     this.unitPositions = const {},
     this.unitColors = const {},
+    this.units = const [],
+    this.mapSlug,
     this.orders = const [],
     required this.onProvinceTapped,
     this.onSvgParsed,
@@ -101,7 +239,26 @@ class _MapViewerState extends State<MapViewer> {
   // neither ever passed `scPositions`, which is exactly why supply centers
   // never appeared).
   final Map<String, Offset> _svgScPositions = {};
+  // Province-code labels baked into the SVG's own `g#labels` — parsed once
+  // per SVG alongside everything else in `_parseSvg`, same reasoning as
+  // `_svgScPositions`: the sea/land distinction (`cssClass`) has no DB
+  // equivalent, so this widget is the only source for it.
+  final List<MapLabel> _svgLabels = [];
   Size _mapSize = const Size(1000, 1000); // Default, updated on parse
+
+  // Unit icon paths for the current `widget.mapSlug`, loaded lazily from the
+  // bundled per-map SVGs and cached here so sixteen small files are parsed
+  // once per map open, not once per frame. Null after a failed load (or
+  // before the first load completes) — `MapPainter` falls back to the
+  // lettered circle in that case.
+  UnitIcon? _armyIcon;
+  UnitIcon? _fleetIcon;
+  // The slug `_armyIcon`/`_fleetIcon` were loaded for, so `_ensureUnitIcons`
+  // can tell "loaded for null (no slug given, using classic)" apart from
+  // "never loaded yet" — both would otherwise look like `_iconsLoadedForSlug
+  // == null`.
+  bool _iconsLoadedOnce = false;
+  String? _iconsLoadedForSlug;
 
   // Bumped every time `_parseSvg` successfully replaces the parsed data.
   // `_paths` and friends are mutated in place, so comparing map identity in
@@ -132,6 +289,7 @@ class _MapViewerState extends State<MapViewer> {
     _parseSvg().then((_) {
       if (mounted) setState(() {});
     });
+    _ensureUnitIcons();
   }
 
   @override
@@ -141,6 +299,64 @@ class _MapViewerState extends State<MapViewer> {
       _parseSvg().then((_) {
         if (mounted) setState(() {});
       });
+    }
+    if (oldWidget.mapSlug != widget.mapSlug) {
+      _ensureUnitIcons();
+    }
+  }
+
+  // Loads (and caches) the army/fleet icon set for `widget.mapSlug`. A no-op
+  // once already loaded for that slug — safe to call from both `initState`
+  // and `didUpdateWidget` unconditionally.
+  Future<void> _ensureUnitIcons() async {
+    final slug = widget.mapSlug;
+    if (_iconsLoadedOnce && _iconsLoadedForSlug == slug) return;
+    final suffix = slug != null ? (_unitIconSuffixByMapSlug[slug] ?? slug.replaceAll('_', '')) : 'classic';
+    final army = await _loadUnitIcon('army', suffix);
+    final fleet = await _loadUnitIcon('fleet', suffix);
+    if (!mounted) return;
+    setState(() {
+      _armyIcon = army;
+      _fleetIcon = fleet;
+      _iconsLoadedForSlug = slug;
+      _iconsLoadedOnce = true;
+    });
+  }
+
+  // Mirrors `loadUnitIcons`'s `load()`: try the map-specific file, and if it
+  // is missing or fails to parse, fall back to the classic pair rather than
+  // leave the unit with no icon at all.
+  Future<UnitIcon?> _loadUnitIcon(String kind, String suffix) async {
+    final direct = await _tryLoadUnitIcon(kind, suffix);
+    if (direct != null) return direct;
+    if (suffix == 'classic') return null;
+    return _tryLoadUnitIcon(kind, 'classic');
+  }
+
+  Future<UnitIcon?> _tryLoadUnitIcon(String kind, String suffix) async {
+    try {
+      final raw = await rootBundle.loadString('assets/maps/units/${kind}_$suffix.svg');
+      final document = XmlDocument.parse(raw);
+      final svgElement = document.findAllElements('svg').first;
+      var viewBox = const Size(44, 24);
+      final viewBoxAttr = svgElement.getAttribute('viewBox');
+      if (viewBoxAttr != null) {
+        final parts = viewBoxAttr.split(RegExp(r'\s+'));
+        if (parts.length >= 4) {
+          viewBox = Size(double.parse(parts[2]), double.parse(parts[3]));
+        }
+      }
+      final paths = <(Path, bool)>[];
+      for (final element in document.findAllElements('path')) {
+        final d = element.getAttribute('d');
+        if (d == null) continue;
+        final cssClass = element.getAttribute('class') ?? '';
+        paths.add((parseSvgPathData(d), cssClass.contains('fill')));
+      }
+      if (paths.isEmpty) return null; // parser error or empty SVG
+      return UnitIcon(viewBox, paths);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -163,6 +379,7 @@ class _MapViewerState extends State<MapViewer> {
     final provinceClasses = <String, String>{};
     final neutralShapes = <NeutralShape>[];
     final svgScPositions = <String, Offset>{};
+    final svgLabels = <MapLabel>[];
     final provinceDataMap = <String, ProvinceData>{};
     var mapSize = _mapSize;
 
@@ -244,6 +461,22 @@ class _MapViewerState extends State<MapViewer> {
         }
       }
 
+      // Province-code labels the map author drew — the only source for a
+      // province the DB has never carried a `label_x`/`label_y` for. Read as
+      // a flat list, not a map: a split-coast province (T05's own risk note)
+      // can carry two `<text>` nodes sharing one code, and folding them into
+      // a `Map<String, MapLabel>` would silently drop one.
+      final gLabels = document.findAllElements('g').where((e) => e.getAttribute('id') == 'labels').firstOrNull;
+      if (gLabels != null) {
+        for (final text in gLabels.findAllElements('text')) {
+          final code = text.innerText.trim();
+          final x = double.tryParse(text.getAttribute('x') ?? '');
+          final y = double.tryParse(text.getAttribute('y') ?? '');
+          if (code.isEmpty || x == null || y == null) continue;
+          svgLabels.add(MapLabel(code: code, position: Offset(x, y), cssClass: text.getAttribute('class') ?? 'lbl-land'));
+        }
+      }
+
       final gProvinces = document.findAllElements('g').where((e) => e.getAttribute('id') == 'provinces').firstOrNull;
       final pathElements = gProvinces != null ? gProvinces.findAllElements('path') : document.findAllElements('path');
       for (final element in pathElements) {
@@ -282,6 +515,9 @@ class _MapViewerState extends State<MapViewer> {
     _svgScPositions
       ..clear()
       ..addAll(svgScPositions);
+    _svgLabels
+      ..clear()
+      ..addAll(svgLabels);
     _mapSize = mapSize;
     _parseGeneration++;
 
@@ -380,14 +616,32 @@ class _MapViewerState extends State<MapViewer> {
                     parseGeneration: _parseGeneration,
                     provinceColors: widget.provinceColors,
                     labelPositions: widget.labelPositions,
-                    // Self-parsed positions first, so an explicit override
-                    // from the caller (none exists today) always wins.
-                    scPositions: {..._svgScPositions, ...widget.scPositions},
+                    svgLabels: _svgLabels,
+                    // A caller-supplied position list wins exclusively over
+                    // the SVG's own circles once it is non-empty — a DB that
+                    // has dropped a supply centre must be able to remove the
+                    // dot, which a plain merge could never do. Only when the
+                    // caller has passed nothing at all (still true of both
+                    // `game_screen.dart` and `preview_screen.dart` today) does
+                    // this fall back to what the SVG was authored with.
+                    scPositions: widget.scPositions.isNotEmpty ? widget.scPositions : _svgScPositions,
                     unitPositions: widget.unitPositions,
                     unitColors: widget.unitColors,
+                    units: widget.units,
+                    armyIcon: _armyIcon,
+                    fleetIcon: _fleetIcon,
+                    unitIconSize: widget.mapSlug != null ? (_unitIconSizeByMapSlug[widget.mapSlug] ?? 22) : 22,
                     activeOrderUnitProvince: widget.activeOrderUnitProvince,
                     validTargetProvinces: widget.validTargetProvinces,
                   ),
+                  // Deliberately a `foregroundPainter`, not folded into
+                  // `MapPainter`: an order arrow originates AT a unit token
+                  // (or a label anchor, for a target with no unit) and has to
+                  // stay legible drawn over it, an SC dot, and a province
+                  // label alike — the same reason `arrows_overlay.js`'s SVG
+                  // group is appended after `drawUnits()`/`drawSupplyCenters()`
+                  // in the Mini App, putting arrows last in paint order there
+                  // too.
                   foregroundPainter: OrderArrowsPainter(widget.orders),
                 ),
               ),
@@ -406,9 +660,14 @@ class MapPainter extends CustomPainter {
   final int parseGeneration;
   final Map<String, Color> provinceColors;
   final Map<String, Offset> labelPositions;
+  final List<MapLabel> svgLabels;
   final Map<String, Offset> scPositions;
   final Map<String, Offset> unitPositions;
   final Map<String, Color> unitColors;
+  final List<MapUnit> units;
+  final UnitIcon? armyIcon;
+  final UnitIcon? fleetIcon;
+  final double unitIconSize;
   final String? activeOrderUnitProvince;
   final Set<String> validTargetProvinces;
 
@@ -419,9 +678,14 @@ class MapPainter extends CustomPainter {
     required this.parseGeneration,
     required this.provinceColors,
     required this.labelPositions,
+    this.svgLabels = const [],
     required this.scPositions,
     required this.unitPositions,
     this.unitColors = const {},
+    this.units = const [],
+    this.armyIcon,
+    this.fleetIcon,
+    this.unitIconSize = 22,
     this.activeOrderUnitProvince,
     required this.validTargetProvinces,
   });
@@ -487,47 +751,46 @@ class MapPainter extends CustomPainter {
       );
     }
 
-    // 2. Draw Labels
+    // 2. Draw labels. Base position and style come from the SVG's own
+    // `g#labels` — so every province the map author labelled gets a code
+    // even if the DB has never touched it — overridden by
+    // `labelPositions[code]` when the DB has moved it, the same precedence
+    // `applyLabelPositions` uses in the Mini App. A DB code with no matching
+    // SVG `<text>` (e.g. a province the admin renamed) still gets drawn,
+    // using the land style, since sea/land is SVG-only information.
+    final labelledCodes = <String>{};
+    for (final label in svgLabels) {
+      labelledCodes.add(label.code);
+      final position = labelPositions[label.code] ?? label.position;
+      _drawLabel(canvas, label.code, position, _labelStyles[label.cssClass] ?? _labelStyles['lbl-land']!);
+    }
     for (final entry in labelPositions.entries) {
-      final provinceId = entry.key;
-      final offset = entry.value;
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: provinceId,
-          style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(offset.dx - textPainter.width / 2, offset.dy - textPainter.height / 2));
+      if (labelledCodes.contains(entry.key)) continue;
+      _drawLabel(canvas, entry.key, entry.value, _labelStyles['lbl-land']!);
     }
 
-    // 3. Draw Supply Centers (stars)
-    for (final entry in scPositions.entries) {
-      final offset = entry.value;
-      _drawStar(canvas, offset, Colors.yellow); // simplified SC marker
+    // 3. Draw supply centres — after the province fills so the dot always
+    // reads against finished terrain, and before the unit tokens below so an
+    // occupied centre reads as "a unit standing on a centre" rather than the
+    // token being punched through by the dot. Colour and shape mirror the
+    // Mini App's `drawSupplyCenters` and every shipped map's own `.sc` style;
+    // this is cartography ink, not UI state, hence the literal hex instead of
+    // `AppColors` (same reasoning as `_neutralStyles` and the label styles
+    // above).
+    for (final offset in scPositions.values) {
+      _drawSupplyCentre(canvas, offset);
     }
 
-    // 4. Draw Units
-    for (final entry in unitPositions.entries) {
-      final provinceId = entry.key;
-      final offset = entry.value;
-      // A unit's own colour comes from ITS owner, not the province's supply-
-      // center tint — those differ whenever a unit sits in a non-SC province,
-      // or holds a center a different empire currently owns.
-      final color = unitColors[provinceId] ?? provinceColors[provinceId] ?? Colors.grey;
-      
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(offset, 10, paint);
-      
-      final strokePaint = Paint()
-        ..color = Colors.black
-        ..strokeWidth = 1.0
-        ..style = PaintingStyle.stroke;
-      canvas.drawCircle(offset, 10, strokePaint);
+    // 4. Draw units. A caller that has resolved real `MapUnit`s (type,
+    // dislodged state, coast already worked out) gets real army/fleet icons
+    // in its empire's colour; a caller that has only handed over the flat
+    // `unitPositions`/`unitColors` maps — every caller today — still gets the
+    // plain dot, since guessing a shape from data that was never sent would
+    // be actively misleading, not a fix.
+    if (units.isNotEmpty) {
+      _drawUnitTokens(canvas);
+    } else {
+      _drawLegacyUnitDots(canvas);
     }
 
     // 5. Draw Dimming Mask if ordering
@@ -554,10 +817,138 @@ class MapPainter extends CustomPainter {
     }
   }
 
-  void _drawStar(Canvas canvas, Offset center, Color color) {
-    final paint = Paint()..color = color;
-    canvas.drawCircle(center, 5, paint);
-    canvas.drawCircle(center, 5, Paint()..color = Colors.black..style = PaintingStyle.stroke);
+  void _drawLabel(Canvas canvas, String code, Offset position, TextStyle style) {
+    final textPainter = TextPainter(
+      text: TextSpan(text: code, style: style),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(position.dx - textPainter.width / 2, position.dy - textPainter.height / 2));
+  }
+
+  void _drawSupplyCentre(Canvas canvas, Offset center) {
+    canvas.drawCircle(center, 6, Paint()..color = const Color(0xFFCC0000));
+    canvas.drawCircle(
+      center,
+      6,
+      Paint()
+        ..color = const Color(0xFFFFFFFF)
+        ..strokeWidth = 1.2
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  // The pre-T04 rendering: an identical dot for every unit, coloured by its
+  // owner (or, failing that, by the province's own supply-centre tint).
+  // Still the only option when the caller hasn't resolved a `MapUnit` list —
+  // see the comment above `_drawUnitTokens`'s call site.
+  void _drawLegacyUnitDots(Canvas canvas) {
+    for (final entry in unitPositions.entries) {
+      final provinceId = entry.key;
+      final offset = entry.value;
+      // A unit's own colour comes from ITS owner, not the province's supply-
+      // center tint — those differ whenever a unit sits in a non-SC province,
+      // or holds a center a different empire currently owns.
+      final color = unitColors[provinceId] ?? provinceColors[provinceId] ?? Colors.grey;
+
+      canvas.drawCircle(offset, 10, Paint()..color = color..style = PaintingStyle.fill);
+      canvas.drawCircle(
+        offset,
+        10,
+        Paint()
+          ..color = Colors.black
+          ..strokeWidth = 1.0
+          ..style = PaintingStyle.stroke,
+      );
+    }
+  }
+
+  // Real army/fleet icons, scaled to this map's own unit size and recoloured
+  // to each unit's empire — mirrors `makeUnitGroup`. Icons already scale with
+  // zoom for free: they're drawn in the same map-space coordinates as
+  // everything else on this canvas, and `InteractiveViewer` scales the whole
+  // `CustomPaint` as one unit, not this painter's pixels individually.
+  void _drawUnitTokens(Canvas canvas) {
+    for (final unit in units) {
+      final icon = unit.type == 'fleet' ? fleetIcon : armyIcon;
+      if (icon == null) {
+        _drawLetteredUnit(canvas, unit);
+        continue;
+      }
+
+      final scale = unitIconSize / (icon.viewBox.width > icon.viewBox.height ? icon.viewBox.width : icon.viewBox.height);
+      final opacity = unit.isDislodged ? 0.55 : 1.0;
+
+      // Dashed halo only for a dislodged unit — visually flags the emergency
+      // retreat state, matching `makeUnitGroup`'s own halo (and its opacity,
+      // since the JS applies 0.55 to the whole unit group, halo included).
+      if (unit.isDislodged) {
+        final haloPath = dashPath(
+          Path()..addOval(Rect.fromCircle(center: unit.position, radius: 14 * (unitIconSize / 22))),
+          dashArray: CircularIntervalList<double>(const [3, 2]),
+        );
+        canvas.drawPath(
+          haloPath,
+          Paint()
+            ..color = const Color(0xFFB03030).withOpacity(opacity)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
+
+      canvas.save();
+      canvas.translate(
+        unit.position.dx - icon.viewBox.width * scale / 2,
+        unit.position.dy - icon.viewBox.height * scale / 2,
+      );
+      canvas.scale(scale);
+      for (final (path, filled) in icon.paths) {
+        // `class="fill"` → paint in the empire colour, with the icon's own
+        // dark outline. `class="stroke"` → that outline IS the whole path,
+        // with no fill underneath it — mirrors `makeUnitGroup`'s two
+        // branches without a separate code path per class.
+        if (filled) {
+          canvas.drawPath(path, Paint()..style = PaintingStyle.fill..color = unit.color.withOpacity(opacity));
+        }
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1
+            ..strokeJoin = StrokeJoin.round
+            ..strokeCap = StrokeCap.round
+            ..color = const Color(0xFF1F2A36).withOpacity(opacity),
+        );
+      }
+      canvas.restore();
+    }
+  }
+
+  // Fallback for when an icon failed to load (or hasn't finished loading
+  // yet): the old flat dot, but sized by this map's own unit size and
+  // labelled A/F so it is at least informative — mirrors `makeUnitGroup`'s
+  // own `if (!icon)` branch, including the smaller radius for a dislodged
+  // unit (there is no halo in this branch in the Mini App either).
+  void _drawLetteredUnit(Canvas canvas, MapUnit unit) {
+    final r = (unit.isDislodged ? 6.0 : 9.0) * (unitIconSize / 22);
+    canvas.drawCircle(unit.position, r, Paint()..color = unit.color);
+    canvas.drawCircle(
+      unit.position,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = const Color(0xFF1A1A2E),
+    );
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: unit.type == 'fleet' ? 'F' : 'A',
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, unit.position - Offset(textPainter.width / 2, textPainter.height / 2));
   }
 
   @override
@@ -573,6 +964,10 @@ class MapPainter extends CustomPainter {
         !mapEquals(oldDelegate.provinceColors, provinceColors) ||
         !mapEquals(oldDelegate.unitPositions, unitPositions) ||
         !mapEquals(oldDelegate.unitColors, unitColors) ||
+        !listEquals(oldDelegate.units, units) ||
+        oldDelegate.armyIcon != armyIcon ||
+        oldDelegate.fleetIcon != fleetIcon ||
+        oldDelegate.unitIconSize != unitIconSize ||
         !mapEquals(oldDelegate.labelPositions, labelPositions) ||
         !mapEquals(oldDelegate.scPositions, scPositions) ||
         oldDelegate.activeOrderUnitProvince != activeOrderUnitProvince ||

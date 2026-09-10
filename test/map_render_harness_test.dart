@@ -13,6 +13,7 @@
 // The one thing it does assert is that the paint is not blank, which is the
 // failure mode that started all of this.
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -20,6 +21,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xml/xml.dart';
+import 'package:diplomacy_app/models/board_state.dart';
 import 'package:diplomacy_app/widgets/map_viewer.dart';
 
 /// The map SVGs live in the Django repo, which is the single source of truth
@@ -39,6 +42,65 @@ const _maps = [
 /// A phone, in logical pixels — the viewport the board actually has to fit.
 const _viewport = Size(390, 700);
 
+/// Province-code -> label anchor, read straight out of the SVG's own
+/// `g#labels`, exactly what `map_viewer.dart`'s `_parseSvg` reads for T05.
+/// There is no live game here to carry DB `unit_x`/`unit_y` (those are
+/// DB-owned at runtime, per CONTEXT.md), so this harness anchors every
+/// starting unit at its own province's label position + 16 — the same
+/// unit_x/unit_y-null fallback T04 specifies for `game_screen.dart`'s
+/// `_computeUnits()`.
+Map<String, Offset> _svgLabelPositions(String svg) {
+  final document = XmlDocument.parse(svg);
+  final positions = <String, Offset>{};
+  final gLabels = document.findAllElements('g').where((e) => e.getAttribute('id') == 'labels').firstOrNull;
+  if (gLabels == null) return positions;
+  for (final text in gLabels.findAllElements('text')) {
+    final code = text.innerText.trim();
+    final x = double.tryParse(text.getAttribute('x') ?? '');
+    final y = double.tryParse(text.getAttribute('y') ?? '');
+    if (code.isEmpty || x == null || y == null) continue;
+    positions.putIfAbsent(code, () => Offset(x, y));
+  }
+  return positions;
+}
+
+/// Starting province ownership tints and unit tokens for `name`, read from
+/// the same `<name>.empires.json` the server's own `import_map`/
+/// `export_empires` round-trip through — real empire colours and real
+/// starting armies/fleets, not synthetic placeholders. One unit per map is
+/// flagged dislodged so the harness also exercises T04's halo/opacity path,
+/// which a plain game-start snapshot would never contain.
+(Map<String, Color>, List<MapUnit>) _startingPositionFor(String mapsDir, String name, Map<String, Offset> labelPositions) {
+  final empiresJson = jsonDecode(File('$mapsDir/$name.empires.json').readAsStringSync()) as Map<String, dynamic>;
+  final empires = (empiresJson['empires'] as List).cast<Map<String, dynamic>>();
+
+  final provinceColors = <String, Color>{};
+  final units = <MapUnit>[];
+  var flaggedDislodged = false;
+  for (final empire in empires) {
+    final hex = empire['color'] as String;
+    final color = Color(int.parse('0xFF${hex.substring(1)}'));
+    for (final code in (empire['territory'] as List).cast<String>()) {
+      provinceColors[code] = color.withOpacity(0.55);
+    }
+    for (final raw in (empire['units'] as List).cast<String>()) {
+      final parts = raw.split(' ');
+      final code = parts[1];
+      final anchor = labelPositions[code];
+      if (anchor == null) continue; // no SVG label for this code — skip rather than guess a position
+      units.add(MapUnit(
+        province: code,
+        type: parts[0] == 'F' ? 'fleet' : 'army',
+        position: anchor.translate(0, 16),
+        color: color,
+        isDislodged: !flaggedDislodged,
+      ));
+      flaggedDislodged = true;
+    }
+  }
+  return (provinceColors, units);
+}
+
 void main() {
   // The SVGs live in a sibling checkout of a different repo — real on this
   // machine, but not something any other clone of this repo can assume.
@@ -54,6 +116,8 @@ void main() {
         return;
       }
       final svg = File('$_mapsDir/$name.svg').readAsStringSync();
+      final labelPositions = _svgLabelPositions(svg);
+      final (provinceColors, units) = _startingPositionFor(_mapsDir, name, labelPositions);
 
       tester.view.physicalSize = _viewport;
       tester.view.devicePixelRatio = 1.0;
@@ -67,6 +131,9 @@ void main() {
             key: boundaryKey,
             child: MapViewer(
               svgString: svg,
+              provinceColors: provinceColors,
+              units: units,
+              mapSlug: name,
               onProvinceTapped: (_) {},
             ),
           ),
@@ -74,7 +141,10 @@ void main() {
       ));
 
       // `_parseSvg` deliberately yields for 300 ms before parsing, so that a
-      // page transition is not competing with 269 province paths.
+      // page transition is not competing with 269 province paths. The unit
+      // icon load is a separate async fetch off `rootBundle` kicked off from
+      // `initState`, so it also needs a settle before the tokens the
+      // assertions below expect to see have actually landed.
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
@@ -240,5 +310,194 @@ void main() {
     expect(landColour, const Color(0xFFE8DFC0),
         reason: 'the board still shows the previous map\'s colour after a '
             'same-size svgString swap — didUpdateWidget did not repaint');
+  });
+
+  // The tests above prove `MapViewer` paints given hand-assembled `MapUnit`s
+  // and `scPositions` — they say nothing about whether `BoardState` (and so
+  // `GameScreen`/`GamePreviewScreen`) actually produces those from a real
+  // server payload. This drives `BoardState.units`/`BoardState.scPositions`/
+  // `BoardState.mapSlugFromSvgUrl` — the exact functions T04/T03 wired the
+  // two screens to — through a payload shaped like `_serialize_game_state`
+  // (game/api/serializers.py), then paints the result, so a caller-side
+  // regression (a wrong field name, a dropped coast, a mixed-up y+16) is
+  // caught here even though it would never show up in a test that only
+  // constructs `MapUnit`s directly.
+  group('BoardState → MapViewer conversion', () {
+    // Real coordinates lifted from diplomacy_classic.svg's own `g#labels`/
+    // `g#supply-centers`, not invented numbers — a wrong port of
+    // `unitCenter()`'s field precedence could still "work" against made-up
+    // coordinates that happen not to exercise the label/unit_x fallback.
+    const parLabel = Offset(362.744, 731.981);
+    const parSc = Offset(375.585, 706.754);
+    const lonLabel = Offset(357.376, 638.33);
+    const lonSc = Offset(352.843, 614.879);
+    const mosSc = Offset(1012.67, 511.086);
+    const stpLabel = Offset(904.217, 406.123);
+    const vieSc = Offset(646.451, 754.053);
+
+    // Mirrors `_serialize_game_state`'s `units` rows: one with an admin-set
+    // `unit_x`/`unit_y` (PAR), one relying on the `label_y + 16` fallback
+    // because the admin never set a position (LON, also flagged dislodged
+    // to exercise T04's halo), and a split-coast pair sharing STP with no
+    // `coast_positions` entry at all — so both must fall through to the
+    // ported `COAST_OFFSETS` table rather than land on the same pixel.
+    final units = [
+      {
+        'province_code': 'PAR',
+        'label_x': parLabel.dx, 'label_y': parLabel.dy,
+        'unit_x': parSc.dx, 'unit_y': parSc.dy,
+        'color': '#59a8d3', // FRA
+        'unit_type': 0, // army
+        'is_dislodged': false,
+        'coast': '',
+      },
+      {
+        'province_code': 'LON',
+        'label_x': lonLabel.dx, 'label_y': lonLabel.dy,
+        'unit_x': null, 'unit_y': null,
+        'color': '#196bde', // ENG
+        'unit_type': 1, // fleet
+        'is_dislodged': true,
+        'coast': '',
+      },
+      {
+        'province_code': 'STP',
+        'label_x': stpLabel.dx, 'label_y': stpLabel.dy,
+        'unit_x': null, 'unit_y': null,
+        'color': '#f6d258', // TUR
+        'unit_type': 1,
+        'is_dislodged': false,
+        'coast': 'NC',
+      },
+      {
+        'province_code': 'STP',
+        'label_x': stpLabel.dx, 'label_y': stpLabel.dy,
+        'unit_x': null, 'unit_y': null,
+        'color': '#d15245', // AUS
+        'unit_type': 1,
+        'is_dislodged': false,
+        'coast': 'SC',
+      },
+    ];
+
+    // Mirrors `sc_ownership`: PAR/LON/MOS are real supply centres with
+    // coordinates; VIE is a province the SVG itself marks with a
+    // `<circle class="sc">` (real map data — see `vieSc` above) but whose
+    // ownership row says `is_supply_center: false`, the exact "SC removed
+    // from the DB" case T03 exists for.
+    final scOwnership = [
+      {'province_code': 'PAR', 'empire_code': 'FRA', 'is_supply_center': true, 'sc_x': parSc.dx, 'sc_y': parSc.dy},
+      {'province_code': 'LON', 'empire_code': 'ENG', 'is_supply_center': true, 'sc_x': lonSc.dx, 'sc_y': lonSc.dy},
+      {'province_code': 'MOS', 'empire_code': 'RUS', 'is_supply_center': true, 'sc_x': mosSc.dx, 'sc_y': mosSc.dy},
+      {'province_code': 'VIE', 'empire_code': null, 'is_supply_center': false, 'sc_x': vieSc.dx, 'sc_y': vieSc.dy},
+    ];
+
+    const gameSvgUrl = '/static/maps/diplomacy_classic.svg?v=1234567890';
+
+    test('BoardState.units/scPositions/mapSlugFromSvgUrl read the payload correctly', () {
+      final resolved = BoardState.units(units: units, coastPositions: const {}, armyCoasts: const {});
+      expect(resolved, hasLength(4));
+
+      final par = resolved.firstWhere((u) => u.province == 'PAR');
+      expect(par.position, parSc, reason: 'an admin-set unit_x/unit_y must win over the label fallback');
+      expect(par.type, 'army');
+
+      final lon = resolved.firstWhere((u) => u.province == 'LON');
+      expect(lon.position, lonLabel.translate(0, 16),
+          reason: 'a null unit_x/unit_y must fall back to label_y + 16, matching map.js unitCenter()');
+      expect(lon.isDislodged, isTrue);
+
+      final stpUnits = resolved.where((u) => u.province == 'STP').toList();
+      expect(stpUnits, hasLength(2));
+      // Both STP tokens must actually separate — this is T04's split-coast
+      // acceptance criterion expressed as geometry rather than a screenshot.
+      final separation = (stpUnits[0].position - stpUnits[1].position).distance;
+      expect(separation, greaterThan(50),
+          reason: 'STP/NC and STP/SC must not land on the same pixel — got ${stpUnits[0].position} and ${stpUnits[1].position}');
+      for (final u in stpUnits) {
+        expect(u.position, isNot(stpLabel),
+            reason: 'a split-coast fallback must actually apply the COAST_OFFSETS nudge, not just echo the label position');
+      }
+
+      final scPositions = BoardState.scPositions(scOwnership);
+      expect(scPositions['PAR'], parSc);
+      expect(scPositions['LON'], lonSc);
+      expect(scPositions['MOS'], mosSc);
+      expect(scPositions.containsKey('VIE'), isFalse,
+          reason: 'is_supply_center: false must suppress the dot even though the SVG itself has a <circle class="sc"> for VIE');
+
+      expect(BoardState.mapSlugFromSvgUrl(gameSvgUrl), 'diplomacy_classic');
+    });
+
+    testWidgets('paints the real conversion (visual check)', (tester) async {
+      if (!mapsDirExists) {
+        markTestSkipped('Conspa checkout not found at $_mapsDir.');
+        return;
+      }
+      final svg = File('$_mapsDir/diplomacy_classic.svg').readAsStringSync();
+      final resolvedUnits = BoardState.units(units: units, coastPositions: const {}, armyCoasts: const {});
+      final resolvedScPositions = BoardState.scPositions(scOwnership);
+      final mapSlug = BoardState.mapSlugFromSvgUrl(gameSvgUrl);
+
+      tester.view.physicalSize = _viewport;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: RepaintBoundary(
+            key: boundaryKey,
+            child: MapViewer(
+              svgString: svg,
+              scPositions: resolvedScPositions,
+              units: resolvedUnits,
+              mapSlug: mapSlug,
+              onProvinceTapped: (_) {},
+            ),
+          ),
+        ),
+      ));
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      final boundary = boundaryKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      late Uint8List png;
+      late ui.Image image;
+      await tester.runAsync(() async {
+        image = await boundary.toImage(pixelRatio: 2.0);
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        png = data!.buffer.asUint8List();
+      });
+
+      // The same blankness sanity check the per-map tests above run — this
+      // group's real assertions are the exact-geometry ones above (position,
+      // separation, dislodged flag, SC filtering); this PNG is for the human
+      // check T04 asks for (a split-coast province drawing two separated
+      // tokens, a dislodged halo, SC dots not colliding with tokens), not a
+      // second copy of those as pixel assertions.
+      late int distinctColours;
+      await tester.runAsync(() async {
+        final raw = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final bytes = raw!.buffer.asUint8List();
+        final seen = <int>{};
+        for (var i = 0; i + 3 < bytes.length; i += 4 * 97) {
+          seen.add((bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]);
+        }
+        distinctColours = seen.length;
+      });
+      expect(distinctColours, greaterThan(4),
+          reason: 'board_state_conversion painted $distinctColours distinct colours — effectively blank');
+
+      final out = Directory('build/map_render')..createSync(recursive: true);
+      // Named distinctly from the per-map files above: this one exercises
+      // the BoardState conversion, not a hand-built MapUnit list, so a
+      // reviewer opening it is looking for the split-coast/halo/SC-overlap
+      // behaviour described in this group's doc comment, not general
+      // cartography.
+      File('${out.path}/board_state_conversion.png').writeAsBytesSync(png);
+    });
   });
 }

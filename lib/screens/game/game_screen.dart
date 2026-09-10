@@ -252,6 +252,42 @@ class _GameScreenState extends State<GameScreen> {
     return BoardState.unitPositionsAndColors(units);
   }
 
+  // Supply-centre dots always read the live state, live or in history mode:
+  // a history phase's `sc_ownership` rows carry only `province_code`/
+  // `empire_code` (`_last_phase_payload` in serializers.py), not the
+  // `is_supply_center`/`sc_x`/`sc_y` this needs — same reasoning as
+  // `_computeLabelPositions` reading `_gameState` unconditionally.
+  Map<String, Offset> _computeScPositions() {
+    return BoardState.scPositions(
+      _gameState?['sc_ownership'] as List<dynamic>? ?? [],
+    );
+  }
+
+  // Real army/fleet tokens for the map, in place of the flat
+  // `unitPositions`/`unitColors` maps above. `coast_positions`/`army_coasts`
+  // are static per map, so — like labels and supply centres — these always
+  // come off the live state even in history mode; only the units themselves
+  // switch to the history snapshot.
+  List<MapUnit> _computeUnits() {
+    final units =
+        (_historyPhase ?? _gameState)?['units'] as List<dynamic>? ?? [];
+    return BoardState.units(
+      units: units,
+      coastPositions:
+          _gameState?['coast_positions'] as Map<String, dynamic>?,
+      armyCoasts: _gameState?['army_coasts'] as Map<String, dynamic>?,
+    );
+  }
+
+  // The untranslated SVG basename, so `MapViewer` picks the right per-map
+  // unit icon set and size (see `mapSlugFromSvgUrl`'s doc for why this reads
+  // the SVG URL rather than `map_name`).
+  String? _computeMapSlug() {
+    return BoardState.mapSlugFromSvgUrl(
+      _gameState?['game']?['map_svg_url'] as String?,
+    );
+  }
+
   // `#RRGGBB` -> Color, or null for anything else (including the server's
   // own null, sent for an observer or an empire with no colour assigned).
   // `Empire.color` is a plain CharField with no validator, so a seven-character
@@ -573,8 +609,11 @@ class _GameScreenState extends State<GameScreen> {
                         svgString: _svgString ?? '<svg></svg>',
                         provinceColors: _computeProvinceColors(),
                         labelPositions: _computeLabelPositions(),
+                        scPositions: _computeScPositions(),
                         unitPositions: unitPositions,
                         unitColors: unitColors,
+                        units: _computeUnits(),
+                        mapSlug: _computeMapSlug(),
                         onSvgParsed: (mapData) {
                           bloc.setMapData(mapData);
                         },

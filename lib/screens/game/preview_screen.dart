@@ -91,6 +91,39 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
     return BoardState.unitPositionsAndColors(units);
   }
 
+  // Supply-centre dots, same shape as the live game state — the preview
+  // payload's `sc_ownership` rows carry `is_supply_center`/`sc_x`/`sc_y`
+  // too, one row per province rather than per phase, since a lobby preview
+  // has no history to disagree with.
+  Map<String, Offset> _computeScPositions() {
+    return BoardState.scPositions(
+      _previewState?['sc_ownership'] as List<dynamic>? ?? [],
+    );
+  }
+
+  // Real army/fleet starting tokens, in place of the flat
+  // `unitPositions`/`unitColors` maps above. `_serialize_preview_state`
+  // ships the same `coast_positions`/`army_coasts` shape the live state
+  // does.
+  List<MapUnit> _computeUnits() {
+    final units = _previewState?['units'] as List<dynamic>? ?? [];
+    return BoardState.units(
+      units: units,
+      coastPositions:
+          _previewState?['coast_positions'] as Map<String, dynamic>?,
+      armyCoasts: _previewState?['army_coasts'] as Map<String, dynamic>?,
+    );
+  }
+
+  // The untranslated SVG basename — `_serialize_preview_state`'s own
+  // `map_name` is translated (`str(_(game.game_map.name))`), so this must
+  // read the SVG URL instead, same as `GameScreen`.
+  String? _computeMapSlug() {
+    return BoardState.mapSlugFromSvgUrl(
+      _previewState?['game']?['map_svg_url'] as String?,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final (unitPositions, unitColors) = _computeUnitPositionsAndColors();
@@ -123,8 +156,11 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
                   svgString: _svgString!,
                   provinceColors: _computeProvinceColors(),
                   labelPositions: _computeLabelPositions(),
+                  scPositions: _computeScPositions(),
                   unitPositions: unitPositions,
                   unitColors: unitColors,
+                  units: _computeUnits(),
+                  mapSlug: _computeMapSlug(),
                   isReadOnly: true,
                   onProvinceTapped: (province) {},
                 ),
