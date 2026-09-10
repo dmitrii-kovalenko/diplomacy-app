@@ -42,8 +42,16 @@ class LocaleProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearLocale() {
+  void clearLocale() async {
     _locale = null;
     notifyListeners();
+    try {
+      await _storage.delete(key: 'language_code');
+    } catch (_) {
+      // Corrupted Android Keystore (see a26b51f in main.dart) can make a
+      // single delete throw. Wipe secure storage outright rather than
+      // leaving the old language behind for whoever logs in next.
+      await _storage.deleteAll();
+    }
   }
 }

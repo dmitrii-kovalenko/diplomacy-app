@@ -127,6 +127,11 @@ class AuthService {
   Future<void> logout() async {
     await storage.delete(key: 'access_token');
     await storage.delete(key: 'refresh_token');
+    // The device may be shared. Drop the language along with the session so
+    // whoever logs in next gets their own locale instead of inheriting this
+    // account's, which LocaleProvider otherwise has no chance to clear —
+    // nothing here calls back into it.
+    await storage.delete(key: 'language_code');
   }
   
   Future<Map<String, dynamic>> fetchMe() async {
@@ -139,5 +144,9 @@ class AuthService {
     await storage.delete(key: 'access_token');
     await storage.delete(key: 'refresh_token');
     await storage.delete(key: 'analytics_consent');
+    // Same reasoning as logout(): this also lands the next person on the
+    // login screen, so it must not leave the deleted account's language
+    // behind either.
+    await storage.delete(key: 'language_code');
   }
 }
