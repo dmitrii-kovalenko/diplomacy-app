@@ -34,23 +34,27 @@ class _LoginScreenState extends State<LoginScreen> {
       await action();
       await _checkNicknameAndProceed();
     } catch (e) {
+      debugPrint(e.toString());
       if (!mounted) return;
-      showToast(context, '$failureLabel $e', isError: true);
+      showToast(context, failureLabel, isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _login() => _run(
-      () => _authService.login(
-          _emailController.text, _passwordController.text),
-      'Sign-in failed.');
+  void _login() {
+    final loc = AppLocalizations.of(context)!;
+    _run(
+        () => _authService.login(
+            _emailController.text, _passwordController.text),
+        loc.authSignInFailed);
+  }
 
-  void _loginWithGoogle() =>
-      _run(_authService.loginWithGoogle, 'Google sign-in failed.');
+  void _loginWithGoogle() => _run(
+      _authService.loginWithGoogle, AppLocalizations.of(context)!.authGoogleSignInFailed);
 
-  void _loginWithApple() =>
-      _run(_authService.loginWithApple, 'Apple sign-in failed.');
+  void _loginWithApple() => _run(
+      _authService.loginWithApple, AppLocalizations.of(context)!.authAppleSignInFailed);
 
   Future<void> _checkNicknameAndProceed() async {
     try {
@@ -66,8 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
+      debugPrint(e.toString());
       if (mounted) {
-        showToast(context, 'Could not load your profile. $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.authProfileLoadError,
+            isError: true);
       }
     }
   }
@@ -100,9 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   const _Wordmark(),
                   const SizedBox(height: AppSpacing.huge),
                   if (_isLoading)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: AppSpacing.huge),
-                      child: AppLoader(label: 'Signing in…'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
+                      child: AppLoader(label: loc.authSigningIn),
                     )
                   else ...[
                     SignInWithAppleButton(
@@ -128,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md),
-                          child: Text('or',
+                          child: Text(loc.authOrDivider,
                               style: t.bodySmall
                                   ?.copyWith(color: c.labelTertiary)),
                         ),
@@ -145,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         _AuthField(
                           controller: _emailController,
                           label: loc.email,
-                          hint: 'you@example.com',
+                          hint: loc.authEmailHint,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                         ),
@@ -189,6 +195,7 @@ class _Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
     return Column(
       children: [
         Container(
@@ -203,10 +210,11 @@ class _Wordmark extends StatelessWidget {
           child: Icon(Icons.handshake_outlined, size: 32, color: c.accent),
         ),
         const SizedBox(height: AppSpacing.xl),
+        // 'Hegemony' is the brand name and stays untranslated in every locale.
         Text('Hegemony', style: t.displayLarge, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'Alliances & Betrayals',
+          loc.authTagline,
           style: t.bodyLarge?.copyWith(color: c.labelSecondary),
           textAlign: TextAlign.center,
         ),

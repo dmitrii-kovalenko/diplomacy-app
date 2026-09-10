@@ -71,13 +71,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   };
 
   Future<void> _resetKey() async {
+    final loc = AppLocalizations.of(context)!;
     final ok = await confirm(
       context,
-      title: 'Reset encryption key?',
-      message:
-          'You will lose access to every end-to-end encrypted conversation '
-          'you have had so far. This cannot be undone.',
-      confirmLabel: 'Reset key',
+      title: loc.settingsResetKeyTitle,
+      message: loc.settingsResetKeyMessage,
+      confirmLabel: loc.settingsResetKeyConfirm,
       destructive: true,
     );
     if (!ok) return;
@@ -88,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isResetting = false);
     await _loadFingerprint();
     if (!mounted) return;
-    showToast(context, 'A new key pair was generated.');
+    showToast(context, AppLocalizations.of(context)!.settingsNewKeyGeneratedToast);
   }
 
   Future<void> _copyFingerprint() async {
@@ -96,7 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (value == null) return;
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    showToast(context, 'Fingerprint copied to clipboard.');
+    showToast(context, AppLocalizations.of(context)!.settingsFingerprintCopiedToast);
   }
 
   /// Maps a Flutter locale code to the code `settings.LANGUAGES` on the
@@ -109,9 +108,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       flutterCode == 'uk' ? 'ua' : flutterCode;
 
   Future<void> _changeLanguage(String current) async {
+    final loc = AppLocalizations.of(context)!;
     final lang = await showChoiceSheet<String>(
       context,
-      title: 'Language',
+      title: loc.language,
       selected: current,
       options: [
         for (final e in _languages.entries)
@@ -131,19 +131,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       showToast(
         context,
-        'Could not sync the language to your account — it will only apply '
-        'on this device for now.',
+        AppLocalizations.of(context)!.settingsLanguageSyncError,
         isError: true,
       );
     }
   }
 
   Future<void> _logout() async {
+    final loc = AppLocalizations.of(context)!;
     final ok = await confirm(
       context,
-      title: 'Sign out?',
-      message: 'Your games stay where they are. You can sign back in anytime.',
-      confirmLabel: 'Sign out',
+      title: loc.settingsSignOutTitle,
+      message: loc.settingsSignOutMessage,
+      confirmLabel: loc.settingsSignOutConfirm,
     );
     if (!ok) return;
     await _authService.logout();
@@ -155,14 +155,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _deleteAccount() async {
+    final loc = AppLocalizations.of(context)!;
     final ok = await confirm(
       context,
-      title: 'Konto löschen?',
-      message:
-          'Diese Aktion ist unwiderruflich. Dein Konto und alle zugehörigen '
-          'Daten werden dauerhaft gelöscht.',
-      confirmLabel: 'Konto löschen',
-      cancelLabel: 'Abbrechen',
+      title: loc.settingsDeleteAccountTitle,
+      message: loc.settingsDeleteAccountMessage,
+      confirmLabel: loc.settingsDeleteAccountConfirm,
       destructive: true,
     );
     if (!ok) return;
@@ -175,8 +173,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         (route) => false,
       );
     } catch (e) {
+      debugPrint(e.toString());
       if (mounted) {
-        showToast(context, 'Fehler beim Löschen des Kontos: $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.settingsDeleteAccountError,
+            isError: true);
       }
     }
   }
@@ -186,11 +186,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!ok && mounted) {
-        showToast(context, 'Could not open the community link.', isError: true);
+        showToast(context, AppLocalizations.of(context)!.settingsCommunityLinkError,
+            isError: true);
       }
     } catch (e) {
+      debugPrint(e.toString());
       if (mounted) {
-        showToast(context, 'Could not open the link. $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.settingsGenericLinkError,
+            isError: true);
       }
     }
   }
@@ -206,8 +209,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final pub = _e2eeService.myPublicKeyBase64;
     final fingerprint = pub == null
-        ? 'Not generated'
-        : 'Active';
+        ? loc.settingsFingerprintNotGenerated
+        : loc.settingsE2eeActive;
 
     return Scaffold(
       body: CustomScrollView(
@@ -230,8 +233,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => _changeLanguage(currentLang),
                 ),
                 InsetRow(
-                  title: 'Linked devices',
-                  subtitle: 'Use one account on phone, web and Telegram',
+                  title: loc.settingsLinkedDevicesTitle,
+                  subtitle: loc.settingsLinkedDevicesSubtitle,
                   icon: CupertinoIcons.link,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -242,18 +245,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             InsetSection(
               header: loc.security,
-              footer:
-                  'Private conversations are encrypted on your device. We '
-                  'never hold the key that opens them.',
+              footer: loc.settingsSecurityFooter,
               children: [
                 InsetRow(
-                  title: 'End-to-end encryption',
+                  title: loc.settingsE2eeTitle,
                   subtitle: fingerprint,
                   icon: CupertinoIcons.lock_fill,
                   iconColor: c.green,
                   showChevron: false,
                   trailing: StatusPill(
-                    pub == null ? 'Not set up' : 'Active',
+                    pub == null ? loc.settingsE2eeNotSetUp : loc.settingsE2eeActive,
                     tone: pub == null
                         ? StatusTone.warning
                         : StatusTone.positive,
@@ -261,8 +262,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 if (pub != null)
                   InsetRow(
-                    title: 'Your fingerprint',
-                    subtitle: _fingerprint ?? 'Computing…',
+                    title: loc.settingsFingerprintLabel,
+                    subtitle: _fingerprint ?? loc.settingsComputingEllipsis,
                     icon: CupertinoIcons.number,
                     iconColor: c.green,
                     showChevron: false,
@@ -273,7 +274,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             size: 15, color: c.labelTertiary),
                   ),
                 InsetRow(
-                  title: 'Reset key pair',
+                  title: loc.settingsResetKeyRowTitle,
                   icon: CupertinoIcons.arrow_2_circlepath,
                   destructive: true,
                   showChevron: false,
@@ -301,24 +302,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             InsetSection(
-              header: 'Rechtliches',
+              header: loc.settingsLegalSectionHeader,
               children: [
                 InsetRow(
-                  title: 'Legal Notice (Impressum)',
+                  title: loc.legalImpressumTitle,
                   icon: CupertinoIcons.building_2_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ImpressumScreen()),
                   ),
                 ),
                 InsetRow(
-                  title: 'Privacy Policy',
+                  title: loc.legalPrivacyTitle,
                   icon: CupertinoIcons.hand_raised_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const PrivacyScreen()),
                   ),
                 ),
                 InsetRow(
-                  title: 'Open-Source Lizenzen',
+                  title: loc.settingsLicensesTitle,
                   icon: CupertinoIcons.doc_text_fill,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -348,7 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _logout,
                 ),
                 InsetRow(
-                  title: 'Konto löschen',
+                  title: loc.settingsDeleteAccountConfirm,
                   icon: CupertinoIcons.trash_fill,
                   destructive: true,
                   showChevron: false,

@@ -8,6 +8,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../theme/app_theme.dart';
 
@@ -753,14 +754,20 @@ Future<T?> showChoiceSheet<T>(
 }
 
 /// Apple-styled confirmation. Destructive choices are red and never the default.
+///
+/// [cancelLabel] defaults to the localized "Cancel" resolved from [context];
+/// it cannot be a `const` default because it depends on the active locale, so
+/// the parameter is nullable and the fallback is applied in the body instead.
 Future<bool> confirm(
   BuildContext context, {
   required String title,
   required String message,
   required String confirmLabel,
-  String cancelLabel = 'Cancel',
+  String? cancelLabel,
   bool destructive = false,
 }) async {
+  final resolvedCancelLabel =
+      cancelLabel ?? AppLocalizations.of(context)!.commonCancel;
   final result = await showDialog<bool>(
     context: context,
     barrierColor: AppColors.of(context).scrim,
@@ -782,7 +789,7 @@ Future<bool> confirm(
           actions: [
             CupertinoDialogAction(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text(cancelLabel, style: TextStyle(color: c.accent)),
+              child: Text(resolvedCancelLabel, style: TextStyle(color: c.accent)),
             ),
             CupertinoDialogAction(
               isDestructiveAction: destructive,

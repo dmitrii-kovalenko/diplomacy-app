@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -40,8 +41,10 @@ class _NicknameScreenState extends State<NicknameScreen> {
         );
       }
     } catch (e) {
+      debugPrint(e.toString());
       if (mounted) {
-        showToast(context, 'Could not save that name. $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.nicknameSaveError,
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -58,6 +61,7 @@ class _NicknameScreenState extends State<NicknameScreen> {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
     final canContinue = _nicknameController.text.trim().isNotEmpty;
 
     return Scaffold(
@@ -68,11 +72,10 @@ class _NicknameScreenState extends State<NicknameScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppSpacing.huge),
-              Text('What should we call you?', style: t.displayMedium),
+              Text(loc.nicknamePromptTitle, style: t.displayMedium),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Other players see this name in the lobby and in negotiations. '
-                'You can change it later in Settings.',
+                loc.nicknamePromptSubtitle,
                 style: t.bodyLarge?.copyWith(color: c.labelSecondary),
               ),
               const SizedBox(height: AppSpacing.xxxl),
@@ -85,12 +88,14 @@ class _NicknameScreenState extends State<NicknameScreen> {
                 maxLength: 24,
                 style: t.headlineSmall,
                 decoration: const InputDecoration(
+                  // A fixed historical name, kept as the placeholder in every
+                  // locale rather than translated — see T13's decision.
                   hintText: 'Talleyrand',
                   counterText: '',
                 ),
               ),
               const Spacer(),
-              AppButton('Continue',
+              AppButton(loc.nicknameContinueButton,
                   loading: _isLoading,
                   onPressed: canContinue ? _saveNickname : null),
               const SizedBox(height: AppSpacing.xxl),

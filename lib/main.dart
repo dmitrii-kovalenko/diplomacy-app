@@ -42,6 +42,7 @@ Future<bool> _showConsentSheet(BuildContext context) async {
     builder: (ctx) {
       final c = AppColors.of(ctx);
       final t = Theme.of(ctx).textTheme;
+      final loc = AppLocalizations.of(ctx)!;
       return StatefulBuilder(
         builder: (ctx, setState) {
           return AppSheet(
@@ -57,12 +58,10 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Privacy Settings',
-                              style: t.displaySmall),
+                          Text(loc.consentTitle, style: t.displaySmall),
                           const SizedBox(height: AppSpacing.sm),
                           Text(
-                            'You decide which data we process. You can change '
-                            'this at any time in the settings.',
+                            loc.consentSubtitle,
                             style:
                                 t.bodyMedium?.copyWith(color: c.labelSecondary),
                           ),
@@ -72,18 +71,15 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                     const SizedBox(height: AppSpacing.lg),
                     InsetSection(
                       children: [
-                        const InsetSwitchRow(
-                          title: 'Necessary',
-                          subtitle:
-                              'Required for the core functions of the app.',
+                        InsetSwitchRow(
+                          title: loc.consentNecessaryTitle,
+                          subtitle: loc.consentNecessarySubtitle,
                           value: true,
                           onChanged: null,
                         ),
                         InsetSwitchRow(
-                          title: 'Analytics & Crashlytics',
-                          subtitle:
-                              'Hilft uns, Abstürze zu beheben und die App zu '
-                              'verbessern.',
+                          title: loc.consentAnalyticsTitle,
+                          subtitle: loc.consentAnalyticsSubtitle,
                           value: analyticsEnabled,
                           onChanged: (val) =>
                               setState(() => analyticsEnabled = val),
@@ -95,7 +91,7 @@ Future<bool> _showConsentSheet(BuildContext context) async {
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.gutter),
                       child: AppButton(
-                        'Save',
+                        loc.consentSaveButton,
                         onPressed: () =>
                             Navigator.of(ctx).pop(analyticsEnabled),
                       ),
@@ -262,22 +258,26 @@ class _InitializerScreenState extends State<InitializerScreen> {
       } else {
         // Network error or 500. Do not log out! Just show a retry button or go to lobby in offline mode.
         // For now, let's just show an error state that lets them retry.
+        if (!mounted) return;
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Connection Error'),
-            content: const Text('Could not connect to the server.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _checkAuth(); // Retry
-                },
-                child: const Text('Retry'),
-              )
-            ],
-          ),
+          builder: (ctx) {
+            final loc = AppLocalizations.of(ctx)!;
+            return AlertDialog(
+              title: Text(loc.connectionErrorTitle),
+              content: Text(loc.connectionErrorMessage),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _checkAuth(); // Retry
+                  },
+                  child: Text(loc.retryButton),
+                )
+              ],
+            );
+          },
         );
       }
     }
@@ -334,7 +334,7 @@ class BrandMark extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Negotiate. Ally. Betray.',
+            AppLocalizations.of(context)!.brandTagline,
             style: t.bodySmall?.copyWith(
               color: c.labelTertiary,
               letterSpacing: 0.4,

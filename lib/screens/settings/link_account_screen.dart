@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'dart:convert';
 
 import '../../services/auth_service.dart';
@@ -54,21 +55,23 @@ bool _isGenerating = false;
     try {
       final res = await _authService.dio.post('/api/auth/link/generate/');
       final data = res.data;
-      
+
       await _e2eeService.init();
       final keyStr = await _e2eeService.exportKey();
       String fullCode = data['code'];
       if (keyStr != null) {
-        fullCode += '-' + base64Encode(utf8.encode(keyStr));
+        fullCode += '-${base64Encode(utf8.encode(keyStr))}';
       }
-      
+
       await Clipboard.setData(ClipboardData(text: fullCode));
-      
+
       if (!mounted) return;
-      showToast(context, 'Code generated and copied to clipboard');
+      showToast(context, AppLocalizations.of(context)!.linkCodeGeneratedToast);
     } catch (e) {
+      debugPrint(e.toString());
       if (mounted) {
-        showToast(context, 'Could not generate a code.', isError: true);
+        showToast(context, AppLocalizations.of(context)!.linkGenerateError,
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
@@ -99,13 +102,12 @@ bool _isGenerating = false;
       }
 
       if (!mounted) return;
+      final loc = AppLocalizations.of(context)!;
       showToast(
         context,
         keyImported
-            ? 'Accounts linked. Sign in once more to finish.'
-            : 'Accounts linked, but the encryption key in that code was '
-                'unreadable — reset your key in Settings if old chats look '
-                'wrong.',
+            ? loc.linkAccountsLinkedToast
+            : loc.linkAccountsLinkedKeyUnreadableToast,
         isError: !keyImported,
       );
       Navigator.of(context).pushAndRemoveUntil(
@@ -113,10 +115,20 @@ bool _isGenerating = false;
         (route) => false,
       );
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? 'Linking failed.';
-      if (mounted) showToast(context, msg.toString(), isError: true);
+      // `??` only short-circuits when the server actually sent an `error`
+      // field; a timeout or a 502 HTML body falls through to the lookup, and
+      // this screen navigates away on success — so guard before touching the
+      // element tree, not just before the toast.
+      if (!mounted) return;
+      final msg = e.response?.data?['error'] ??
+          AppLocalizations.of(context)!.linkFailedGeneric;
+      showToast(context, msg.toString(), isError: true);
     } catch (e) {
-      if (mounted) showToast(context, 'Linking failed. $e', isError: true);
+      debugPrint(e.toString());
+      if (mounted) {
+        showToast(context, AppLocalizations.of(context)!.linkFailedGeneric,
+            isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isMerging = false);
     }
@@ -125,9 +137,10 @@ bool _isGenerating = false;
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Linked devices')),
+      appBar: AppBar(title: Text(loc.settingsLinkedDevicesTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
         children: [
@@ -141,8 +154,8 @@ bool _isGenerating = false;
               padding: const EdgeInsets.all(3),
               onValueChanged: (v) => setState(() => _mode = v ?? 0),
               children: {
-                0: _segment(context, 'Show a code', _mode == 0),
-                1: _segment(context, 'Enter a code', _mode == 1),
+                0: _segment(context, loc.linkShowCodeSegment, _mode == 0),
+                1: _segment(context, loc.linkEnterCodeSegment, _mode == 1),
               },
             ),
           ),
@@ -174,19 +187,20 @@ bool _isGenerating = false;
   Widget _generatePane() {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Column(
       key: const ValueKey('generate'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Generate a code here, then paste it on your other device.',
+          loc.linkGenerateInstructions,
           style: t.bodyMedium?.copyWith(color: c.labelSecondary),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.xxl),
         AppButton(
-          'Generate & Copy Code',
+          loc.linkGenerateButton,
           style: AppButtonStyle.filled,
           loading: _isGenerating,
           onPressed: _generateCode,
@@ -198,6 +212,7 @@ bool _isGenerating = false;
   Widget _enterPane() {
     final c = AppColors.of(context);
     final t = Theme.of(context).textTheme;
+    final loc = AppLocalizations.of(context)!;
     final ready = _codeController.text.trim().split('-')[0].length == 6;
 
     return Column(
@@ -205,7 +220,7 @@ bool _isGenerating = false;
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Paste the code from your other device here.',
+          loc.linkEnterInstructions,
           style: t.bodyMedium?.copyWith(color: c.labelSecondary),
           textAlign: TextAlign.center,
         ),
@@ -252,7 +267,7 @@ bool _isGenerating = false;
         ),
         const SizedBox(height: AppSpacing.xl),
         AppButton(
-          'Paste from clipboard & Link',
+          loc.linkPasteButton,
           onPressed: () async {
             final data = await Clipboard.getData('text/plain');
             if (data != null && data.text != null) {
@@ -264,7 +279,7 @@ bool _isGenerating = false;
         ),
         const SizedBox(height: AppSpacing.sm),
         AppButton(
-          'Link this device',
+          loc.linkThisDeviceButton,
           loading: _isMerging,
           onPressed: ready ? _mergeAccount : null,
         ),

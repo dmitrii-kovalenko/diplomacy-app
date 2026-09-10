@@ -26,25 +26,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _submitted = false;
 
   String? get _emailError {
+    final loc = AppLocalizations.of(context)!;
     final v = _emailController.text.trim();
-    if (v.isEmpty) return _submitted ? 'Enter your email address.' : null;
+    if (v.isEmpty) return _submitted ? loc.authEmailRequiredError : null;
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
-      return 'That does not look like an email address.';
+      return loc.authEmailInvalidError;
     }
     return null;
   }
 
   String? get _passwordError {
+    final loc = AppLocalizations.of(context)!;
     final v = _passwordController.text;
-    if (v.isEmpty) return _submitted ? 'Choose a password.' : null;
-    if (v.length < 8) return 'Use at least 8 characters.';
+    if (v.isEmpty) return _submitted ? loc.authPasswordRequiredError : null;
+    if (v.length < 8) return loc.authPasswordTooShortError;
     return null;
   }
 
   String? get _confirmError {
     if (_confirmPasswordController.text.isEmpty) return null;
     if (_confirmPasswordController.text != _passwordController.text) {
-      return 'The two passwords do not match.';
+      return AppLocalizations.of(context)!.authPasswordMismatchError;
     }
     return null;
   }
@@ -68,12 +70,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passwordController.text,
       );
       if (mounted) {
-        showToast(context, 'Account created — sign in to continue.');
+        showToast(context, AppLocalizations.of(context)!.authAccountCreatedToast);
         Navigator.pop(context);
       }
     } catch (e) {
+      debugPrint(e.toString());
       if (mounted) {
-        showToast(context, 'Registration failed. $e', isError: true);
+        showToast(context, AppLocalizations.of(context)!.authRegistrationFailed,
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -112,25 +116,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
         children: [
           const SizedBox(height: AppSpacing.sm),
-          Text('Create your account', style: t.displaySmall),
+          Text(loc.authCreateAccountTitle, style: t.displaySmall),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'One account carries your games, your chats and your encryption '
-            'keys across every device.',
+            loc.authCreateAccountSubtitle,
             style: t.bodyMedium?.copyWith(color: c.labelSecondary),
           ),
           const SizedBox(height: AppSpacing.xxl),
           _Field(
             controller: _emailController,
             label: loc.email,
-            hint: 'you@example.com',
+            hint: loc.authEmailHint,
             keyboardType: TextInputType.emailAddress,
             error: _emailError,
           ),
           _Field(
             controller: _passwordController,
             label: loc.password,
-            hint: 'At least 8 characters',
+            hint: loc.authPasswordHint,
             obscure: true,
             error: _passwordError,
           ),
