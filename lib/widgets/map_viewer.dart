@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:xml/xml.dart';
 import 'package:path_drawing/path_drawing.dart';
+import '../theme/app_theme.dart';
 import 'order_arrows.dart';
 
 class ProvinceData {
@@ -18,7 +19,25 @@ class ProvinceData {
   /// land`.
   final String cssClass;
 
-  ProvinceData({required this.id, required this.type, required this.adjacencies, required this.path, required this.cssClass});
+  /// Every `data-adj*` attribute this province's SVG node carries — `data-adj`
+  /// itself, `data-adj-river` (fleet edges across a river mouth), and any
+  /// `data-adj-<coast>` (split-coast fleet edges), each already split on
+  /// whitespace — keyed by the full attribute name. `reachability.dart`'s
+  /// `adjListOf(code, attr)` reads straight out of this instead of the widget
+  /// re-parsing the SVG per lookup, mirroring `orders_ui.js`'s `adjListOf`,
+  /// which reads the live DOM node directly. [adjacencies] is exactly
+  /// `adjAttrs['data-adj']`, kept as its own field only because it predates
+  /// this map; nothing in this codebase reads [adjacencies] any more.
+  final Map<String, List<String>> adjAttrs;
+
+  ProvinceData({
+    required this.id,
+    required this.type,
+    required this.adjacencies,
+    required this.path,
+    required this.cssClass,
+    this.adjAttrs = const {},
+  });
 }
 
 /// One shape from the SVG's root-level `<rect>` sea backdrop or its
@@ -491,7 +510,25 @@ class _MapViewerState extends State<MapViewer> {
           provinceClasses[id] = cssClass;
           final adjStr = element.getAttribute('data-adj') ?? '';
           final adjacencies = adjStr.isNotEmpty ? adjStr.split(' ') : <String>[];
-          provinceDataMap[id] = ProvinceData(id: id, type: type, adjacencies: adjacencies, path: path, cssClass: cssClass);
+          // Every data-adj* attribute this node carries (data-adj itself,
+          // data-adj-river, and any per-coast data-adj-nc/sc/ec/wc), not just
+          // the plain one — reachability.dart's fleet-edge and split-coast
+          // rules need the whole set (T18).
+          final adjAttrs = <String, List<String>>{};
+          for (final attribute in element.attributes) {
+            final name = attribute.name.local;
+            if (!name.startsWith('data-adj')) continue;
+            final value = attribute.value.trim();
+            adjAttrs[name] = value.isNotEmpty ? value.split(RegExp(r'\s+')) : const [];
+          }
+          provinceDataMap[id] = ProvinceData(
+            id: id,
+            type: type,
+            adjacencies: adjacencies,
+            path: path,
+            cssClass: cssClass,
+            adjAttrs: adjAttrs,
+          );
         }
       }
     } catch (e) {
@@ -633,6 +670,11 @@ class _MapViewerState extends State<MapViewer> {
                     unitIconSize: widget.mapSlug != null ? (_unitIconSizeByMapSlug[widget.mapSlug] ?? 22) : 22,
                     activeOrderUnitProvince: widget.activeOrderUnitProvince,
                     validTargetProvinces: widget.validTargetProvinces,
+                    // The selection stroke is the design system's single
+                    // accent (AppColors.of(context).accent, patina teal
+                    // 0xFF7CDED8) — never re-inline that hex in a screen or
+                    // a painter.
+                    selectionColor: AppColors.of(context).accent,
                   ),
                   // Deliberately a `foregroundPainter`, not folded into
                   // `MapPainter`: an order arrow originates AT a unit token
@@ -671,6 +713,13 @@ class MapPainter extends CustomPainter {
   final String? activeOrderUnitProvince;
   final Set<String> validTargetProvinces;
 
+  /// The design system's single accent, used for the 3px selection stroke
+  /// (T18). Required, with no default — the one construction site always
+  /// passes `AppColors.of(context).accent`, and a painter must never inline
+  /// its own guess at the value (a stale note once called this colour brass;
+  /// it's patina teal, `0xFF7CDED8`).
+  final Color selectionColor;
+
   MapPainter({
     required this.neutralShapes,
     required this.paths,
@@ -688,6 +737,7 @@ class MapPainter extends CustomPainter {
     this.unitIconSize = 22,
     this.activeOrderUnitProvince,
     required this.validTargetProvinces,
+    required this.selectionColor,
   });
 
   @override
@@ -793,12 +843,23 @@ class MapPainter extends CustomPainter {
       _drawLegacyUnitDots(canvas);
     }
 
-    // 5. Draw Dimming Mask if ordering
+    // 5. Draw the dim veil, then the selection stroke on top of it.
     if (activeOrderUnitProvince != null) {
-      canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
-      
-      // Draw dimming overlay
-      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), Paint()..color = Colors.black54);
+      // Pad the dim rect (and the saveLayer it's drawn into) by the map's
+      // own width/height in every direction, mirroring orders_ui.js's
+      // applyDimOverlay — it pads by max(bbox.w, bbox.h, 1000) so the veil
+      // never falls short when the SVG is panned. The outer clipRect above
+      // already bounds this whole canvas to exactly `size` (this CustomPaint
+      // IS the map, panned/zoomed as one texture by the InteractiveViewer
+      // around it, not scrolled within a larger canvas), so today nothing
+      // outside `size` is ever visible — this padding is defence-in-depth
+      // against that invariant changing, at the cost of one oversized rect.
+      final pad = (size.width > size.height ? size.width : size.height)
+          .clamp(1000.0, double.infinity);
+      final dimRect = Rect.fromLTRB(-pad, -pad, size.width + pad, size.height + pad);
+      canvas.saveLayer(dimRect, Paint());
+
+      canvas.drawRect(dimRect, Paint()..color = Colors.black54);
 
       // Punch holes for valid targets
       final punchPaint = Paint()..blendMode = BlendMode.clear;
@@ -807,13 +868,29 @@ class MapPainter extends CustomPainter {
           canvas.drawPath(paths[target]!, punchPaint);
         }
       }
-      
+
       // Punch hole for the active unit itself
       if (paths.containsKey(activeOrderUnitProvince)) {
         canvas.drawPath(paths[activeOrderUnitProvince]!, punchPaint);
       }
 
       canvas.restore();
+
+      // Accent selection stroke on the acting unit's own province, drawn
+      // AFTER the dim layer (not punched into it) so the selected province
+      // reads as visually distinct from an ordinary un-dimmed legal target —
+      // mirrors orders_ui.js's `.prov-selected` rule (mini_app.css), which
+      // is the only thing that told the two apart there too.
+      final selectedPath = paths[activeOrderUnitProvince];
+      if (selectedPath != null) {
+        canvas.drawPath(
+          selectedPath,
+          Paint()
+            ..color = selectionColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3,
+        );
+      }
     }
   }
 
@@ -971,6 +1048,7 @@ class MapPainter extends CustomPainter {
         !mapEquals(oldDelegate.labelPositions, labelPositions) ||
         !mapEquals(oldDelegate.scPositions, scPositions) ||
         oldDelegate.activeOrderUnitProvince != activeOrderUnitProvince ||
+        oldDelegate.selectionColor != selectionColor ||
         !setEquals(oldDelegate.validTargetProvinces, validTargetProvinces);
   }
 }

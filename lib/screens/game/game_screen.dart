@@ -157,40 +157,65 @@ class _GameScreenState extends State<GameScreen> {
     _loadGame();
   }
 
-  void _showBuildSheet(BuildContext context, OrderBloc bloc) {
-    showAppSheet(
+  // Confirmation before a disband — it is destructive (the unit leaves the
+  // board immediately) and, before T17, fired on a single tap with no
+  // confirmation at all. Shared by the retreat-phase and adjustment-phase
+  // Disband chips.
+  Future<void> _confirmDisband(BuildContext context, OrderBloc bloc) async {
+    final ok = await confirm(
+      context,
+      title: 'Disband this unit?',
+      message: 'It leaves the board for the rest of the game. This cannot be undone.',
+      confirmLabel: 'Disband',
+      destructive: true,
+    );
+    if (!ok) return;
+    bloc.setAction(ActionType.disband);
+  }
+
+  // The coast-prompt hook OrderBloc calls when a fleet move or build targets
+  // a split-coast province — mirrors orders_ui.js's promptCoast. Options
+  // come from `bloc.coastOptionsFor`, which sources them the same way
+  // Reachability does (DB coast_adjacency -> SVG data-adj-<coast> -> the
+  // generic NC/SC pair for a legacy map with neither) rather than this
+  // screen re-deriving them straight from `coast_adjacency` and skipping
+  // that middle SVG rung. `fromCode` narrows a move to the coasts the unit
+  // can actually enter from there — a fleet at BAR moving to STP must never
+  // be offered STP/SC — and is null for a build, which orders_ui.js's own
+  // submitBuild call leaves unfiltered too. A move that narrows to exactly
+  // one coast resolves without ever showing the sheet, matching
+  // promptCoast's own auto-resolve; a build always asks, even with one
+  // option, since orders_ui.js's promptCoast(code) — no fromCode — never
+  // takes that shortcut.
+  Future<String?> _promptCoast(String targetCode, String? fromCode, OrderBloc bloc) async {
+    if (!mounted) return null;
+    final options = bloc.coastOptionsFor(targetCode, from: fromCode);
+    if (fromCode != null && options.length == 1) return options.first;
+
+    String? chosen;
+    await showAppSheet<void>(
       context,
       builder: (ctx) => AppSheet(
-        title: 'Build a unit',
+        title: 'Which coast of $targetCode?',
         child: Padding(
           padding: const EdgeInsets.only(top: AppSpacing.sm),
           child: InsetSection(
             children: [
-              InsetRow(
-                title: 'Army',
-                subtitle: 'Moves overland; can be convoyed',
-                icon: CupertinoIcons.person_fill,
-                showChevron: false,
-                onTap: () {
-                  bloc.setAction(ActionType.buildArmy);
-                  Navigator.pop(ctx);
-                },
-              ),
-              InsetRow(
-                title: 'Fleet',
-                subtitle: 'Moves at sea and along the coast; convoys armies',
-                icon: CupertinoIcons.location_north_fill,
-                showChevron: false,
-                onTap: () {
-                  bloc.setAction(ActionType.buildFleet);
-                  Navigator.pop(ctx);
-                },
-              ),
+              for (final coast in options)
+                InsetRow(
+                  title: coast,
+                  showChevron: false,
+                  onTap: () {
+                    chosen = coast;
+                    Navigator.pop(ctx);
+                  },
+                ),
             ],
           ),
         ),
       ),
     );
+    return chosen;
   }
 
   String get _turnLabel {
@@ -482,12 +507,18 @@ class _GameScreenState extends State<GameScreen> {
 
     return ChangeNotifierProvider(
       create: (_) {
-        final bloc = OrderBloc(
+        // `late` so the closure below can hand the bloc back to
+        // `_promptCoast`, which needs it for `coastOptionsFor` — the bloc
+        // has no BuildContext of its own to reach the picker UI with, and
+        // the picker needs the bloc to reach Reachability's coast data.
+        late final OrderBloc bloc;
+        bloc = OrderBloc(
           widget.gameId,
           onOrderSubmitted: _loadGame,
           onOrderError: (message) {
             if (mounted) showToast(context, message, isError: true);
           },
+          onCoastPrompt: (target, from) => _promptCoast(target, from, bloc),
         );
         bloc.setGameState(_gameState!);
         return bloc;
@@ -594,6 +625,16 @@ class _GameScreenState extends State<GameScreen> {
                 children: [
                   Consumer<OrderBloc>(
                     builder: (context, bloc, child) {
+                      // OrderBloc's `create` callback only runs once per
+                      // screen lifetime (Provider keeps the same instance
+                      // across rebuilds), so without this the bloc would
+                      // keep reasoning about the game state as it stood at
+                      // the very first build — stale quota, stale
+                      // my_orders, stale units — the moment the player
+                      // submits a single order. Cheap and idempotent, so
+                      // it's safe to call on every build.
+                      bloc.setGameState(_gameState!);
+
                       final (unitPositions, unitColors) =
                           _computeUnitPositionsAndColors();
                       // Order arrows are drawn from the same map-space
@@ -619,39 +660,7 @@ class _GameScreenState extends State<GameScreen> {
                         },
                         onProvinceTapped: (province) {
                           if (_isHistoryMode) return;
-                          bool hasUnit = false;
-                          bool isOwned = false;
-                          bool isOwnedSc = false;
-
-                          final myCode = _gameState?['me']['empire_code'];
-
-                          if (_gameState?['units'] != null) {
-                            for (var u in _gameState!['units']) {
-                              if (u['province_code'] == province) {
-                                hasUnit = true;
-                                if (u['empire_code'] == myCode) isOwned = true;
-                                break;
-                              }
-                            }
-                          }
-
-                          if (_gameState?['sc_ownership'] != null) {
-                            for (var sc in _gameState!['sc_ownership']) {
-                              if (sc['province_code'] == province &&
-                                  sc['empire_code'] == myCode) {
-                                isOwnedSc = true;
-                                break;
-                              }
-                            }
-                          }
-
-                          final phaseKind =
-                              (_gameState?['phase']?['kind'] as num?)
-                                      ?.toInt() ??
-                                  kPhaseMovement;
-
-                          bloc.selectProvince(province, hasUnit, isOwned,
-                              phaseKind, isOwnedSc);
+                          bloc.selectProvince(province);
                         },
                         activeOrderUnitProvince: bloc.selectedProvince,
                         validTargetProvinces: bloc.validTargetProvinces,
@@ -675,14 +684,21 @@ class _GameScreenState extends State<GameScreen> {
             ),
             if (!_isHistoryMode)
               Consumer<OrderBloc>(
-                builder: (context, bloc, child) => _CommandBar(
-                  bloc: bloc,
-                  isReady: _isReady,
-                  orderCount:
-                      (_gameState?['my_orders'] as List?)?.length ?? 0,
-                  onToggleReady: _toggleReady,
-                  onBuild: () => _showBuildSheet(context, bloc),
-                ),
+                builder: (context, bloc, child) {
+                  // Idempotent — see the identical call in the map's own
+                  // Consumer above. Repeated here rather than relied on
+                  // solely from build order, since this bar reads
+                  // bloc.phaseKind/quota/canSupport/canConvoy directly.
+                  bloc.setGameState(_gameState!);
+                  return _CommandBar(
+                    bloc: bloc,
+                    isReady: _isReady,
+                    orderCount:
+                        (_gameState?['my_orders'] as List?)?.length ?? 0,
+                    onToggleReady: _toggleReady,
+                    onConfirmDisband: () => _confirmDisband(context, bloc),
+                  );
+                },
               ),
           ],
         ),
@@ -901,14 +917,18 @@ class _CommandBar extends StatelessWidget {
     required this.isReady,
     required this.orderCount,
     required this.onToggleReady,
-    required this.onBuild,
+    required this.onConfirmDisband,
   });
 
   final OrderBloc bloc;
   final bool isReady;
   final int orderCount;
   final VoidCallback onToggleReady;
-  final VoidCallback onBuild;
+
+  /// Wraps the destructive-action confirmation around `bloc.setAction
+  /// (ActionType.disband)` — Disband appears in both the retreat and the
+  /// adjustment chip sets below, so both go through the same confirmation.
+  final VoidCallback onConfirmDisband;
 
   @override
   Widget build(BuildContext context) {
@@ -918,88 +938,24 @@ class _CommandBar extends StatelessWidget {
     Widget content;
     switch (bloc.currentState) {
       case OrderState.unitSelected:
-        content = Row(
-          key: const ValueKey('actions'),
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  _Action('Hold', CupertinoIcons.shield,
-                      () => bloc.setAction(ActionType.hold)),
-                  _Action('Move', CupertinoIcons.arrow_right,
-                      () => bloc.setAction(ActionType.move)),
-                  _Action('Support', CupertinoIcons.arrow_branch,
-                      () => bloc.setAction(ActionType.support)),
-                  _Action('Convoy', CupertinoIcons.location_north_fill,
-                      () => bloc.setAction(ActionType.convoy)),
-                  _Action('Build', CupertinoIcons.plus_app, onBuild),
-                ]),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            _CancelButton(onTap: bloc.reset),
-          ],
-        );
+        content = _actionsRow(context);
 
-      case OrderState.targetSelection:
-      case OrderState.auxTargetSelection:
-        final isAux = bloc.currentState == OrderState.auxTargetSelection;
-        content = Row(
-          key: const ValueKey('target'),
-          children: [
-            Icon(CupertinoIcons.hand_point_right_fill,
-                size: 18, color: c.accent),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Text(
-                isAux
-                    ? 'Tap where the supported unit is going'
-                    : 'Tap the destination province',
-                style: t.bodyLarge,
-              ),
-            ),
-            _CancelButton(onTap: bloc.reset),
-          ],
-        );
+      case OrderState.buildChoice:
+        content = _buildChoiceRow(context);
 
-      default:
-        content = Row(
-          key: const ValueKey('ready'),
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isReady ? 'Ready' : 'Your move',
-                    style: t.titleSmall
-                        ?.copyWith(color: isReady ? c.green : c.labelPrimary),
-                  ),
-                  Text(
-                    orderCount == 0
-                        ? 'Tap one of your units to give it an order'
-                        : '$orderCount order${orderCount == 1 ? '' : 's'} submitted',
-                    style: t.bodySmall?.copyWith(color: c.labelSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            AppButton(
-              isReady ? 'Not ready' : 'Ready',
-              icon: isReady ? null : CupertinoIcons.check_mark,
-              style:
-                  isReady ? AppButtonStyle.tinted : AppButtonStyle.filled,
-              onPressed: onToggleReady,
-              expand: false,
-              compact: true,
-            ),
-          ],
-        );
+      case OrderState.pendingCancel:
+        content = _pendingCancelRow(context, c, t);
+
+      case OrderState.moveTarget:
+      case OrderState.retreatTarget:
+      case OrderState.supportAux:
+      case OrderState.supportTarget:
+      case OrderState.convoyAux:
+      case OrderState.convoyTarget:
+        content = _targetPromptRow(context, c, t);
+
+      case OrderState.idle:
+        content = _readyRow(c, t);
     }
 
     return Container(
@@ -1020,6 +976,201 @@ class _CommandBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // Movement → Hold/Move/Support/Convoy; retreat → Retreat/Disband;
+  // adjustment (negative quota, a unit was tapped) → Disband. Never all
+  // five in one bar — mirrors orders_ui.js's onProvinceClick, which builds
+  // a different button set per phase kind rather than one fixed row.
+  Widget _actionsRow(BuildContext context) {
+    final actions = <Widget>[];
+    switch (bloc.phaseKind) {
+      case kPhaseRetreat:
+        actions.add(_Action('Retreat', CupertinoIcons.arrow_uturn_left,
+            () => bloc.setAction(ActionType.retreat)));
+        actions.add(_Action(
+            'Disband', CupertinoIcons.xmark_circle, onConfirmDisband));
+      case kPhaseAdjustment:
+        // Only reached when quota < 0 tapped an own unit — build candidates
+        // go through OrderState.buildChoice instead.
+        actions.add(_Action(
+            'Disband', CupertinoIcons.xmark_circle, onConfirmDisband));
+      default:
+        actions.add(_Action('Hold', CupertinoIcons.shield,
+            () => bloc.setAction(ActionType.hold)));
+        actions.add(_Action('Move', CupertinoIcons.arrow_right,
+            () => bloc.setAction(ActionType.move)));
+        // Hide Support/Convoy outright when there is nothing they could
+        // legally do — orders_ui.js drops the button rather than opening a
+        // menu that can only ever be backed out of.
+        if (bloc.canSupport) {
+          actions.add(_Action('Support', CupertinoIcons.arrow_branch,
+              () => bloc.setAction(ActionType.support)));
+        }
+        if (bloc.canConvoy) {
+          actions.add(_Action('Convoy', CupertinoIcons.location_north_fill,
+              () => bloc.setAction(ActionType.convoy)));
+        }
+    }
+
+    return Row(
+      key: const ValueKey('actions'),
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: actions),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        _CancelButton(onTap: bloc.reset),
+      ],
+    );
+  }
+
+  // Adjustment build menu: Army always, Fleet only at a port — mirrors
+  // orders_ui.js's showBuildButtons(code, isPort).
+  Widget _buildChoiceRow(BuildContext context) {
+    final actions = <Widget>[
+      _Action('Army', CupertinoIcons.person_fill,
+          () => bloc.setAction(ActionType.buildArmy)),
+    ];
+    if (bloc.selectedScIsPort) {
+      actions.add(_Action('Fleet', CupertinoIcons.location_north_fill,
+          () => bloc.setAction(ActionType.buildFleet)));
+    }
+    return Row(
+      key: const ValueKey('build'),
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: actions),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        _CancelButton(onTap: bloc.reset),
+      ],
+    );
+  }
+
+  // Re-tapping a province that already carries a submitted build, disband
+  // or retreat order — offers a cancel instead of reopening the order
+  // dialog on top of it (orders_ui.js's existingBuild/existingDisband/
+  // existingOrder checks in onProvinceClick).
+  Widget _pendingCancelRow(BuildContext context, AppColors c, TextTheme t) {
+    final order = bloc.pendingOrder;
+    final type = (order?['order_type'] as num?)?.toInt();
+    String label = 'Cancel order';
+    if (type == kOrderBuild) label = 'Cancel build';
+    if (type == kOrderDisband) label = 'Cancel disband';
+    if (type == kOrderRetreat) label = 'Cancel retreat';
+
+    return Row(
+      key: const ValueKey('pending-cancel'),
+      children: [
+        Expanded(
+          child: Text(
+            'Pending: ${order?['order_type_name'] ?? label} at ${bloc.selectedProvince ?? ''}',
+            style: t.bodyLarge,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        AppButton(
+          label,
+          onPressed: bloc.cancelPendingOrder,
+          style: AppButtonStyle.tinted,
+          compact: true,
+          expand: false,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        _CancelButton(onTap: bloc.reset),
+      ],
+    );
+  }
+
+  // The map is waiting for a tap: a move/retreat destination, a support/
+  // convoy aux unit, or a support/convoy destination. The explicit "Support
+  // hold" button only appears once an aux is chosen and the supporter can
+  // actually reach that aux's own province — mirrors orders_ui.js's
+  // canHoldSupport button, which exists because a tap on the aux province
+  // itself is deliberately ignored (see OrderBloc._onSupportTargetTap).
+  Widget _targetPromptRow(BuildContext context, AppColors c, TextTheme t) {
+    String hint;
+    switch (bloc.currentState) {
+      case OrderState.retreatTarget:
+        hint = 'Tap an adjacent province to retreat there';
+      case OrderState.supportAux:
+        hint = 'Tap the unit you support';
+      case OrderState.supportTarget:
+        hint = "Tap the destination, or use \"Support hold\"";
+      case OrderState.convoyAux:
+        hint = 'Tap the army to convoy';
+      case OrderState.convoyTarget:
+        hint = 'Tap the convoy destination';
+      default:
+        hint = 'Tap the destination province';
+    }
+
+    return Row(
+      key: ValueKey('target-${bloc.currentState}'),
+      children: [
+        Icon(CupertinoIcons.hand_point_right_fill, size: 18, color: c.accent),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: Text(hint, style: t.bodyLarge)),
+        if (bloc.currentState == OrderState.supportTarget && bloc.canSupportHold) ...[
+          AppButton(
+            'Support hold',
+            onPressed: bloc.supportHold,
+            style: AppButtonStyle.tinted,
+            compact: true,
+            expand: false,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        _CancelButton(onTap: bloc.reset),
+      ],
+    );
+  }
+
+  Widget _readyRow(AppColors c, TextTheme t) {
+    return Row(
+      key: const ValueKey('ready'),
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isReady ? 'Ready' : 'Your move',
+                style: t.titleSmall
+                    ?.copyWith(color: isReady ? c.green : c.labelPrimary),
+              ),
+              Text(
+                orderCount == 0
+                    ? 'Tap one of your units to give it an order'
+                    : '$orderCount order${orderCount == 1 ? '' : 's'} submitted',
+                style: t.bodySmall?.copyWith(color: c.labelSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        AppButton(
+          isReady ? 'Not ready' : 'Ready',
+          icon: isReady ? null : CupertinoIcons.check_mark,
+          style: isReady ? AppButtonStyle.tinted : AppButtonStyle.filled,
+          onPressed: onToggleReady,
+          expand: false,
+          compact: true,
+        ),
+      ],
     );
   }
 }
