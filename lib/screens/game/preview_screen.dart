@@ -125,6 +125,17 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
     );
   }
 
+  // Mirrors `GameScreen._showProvinceName`. The names come from the preview
+  // payload's `province_names`, already translated server-side, and the
+  // preview is where a player first meets an unfamiliar map — so this matters
+  // at least as much here as on the live board.
+  void _showProvinceName(BuildContext context, String code) {
+    final names = _previewState?['province_names'] as Map<String, dynamic>?;
+    final name = names?[code] as String?;
+    if (name == null) return;
+    showToast(context, '$name ($code)');
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -165,6 +176,8 @@ class _GamePreviewScreenState extends State<GamePreviewScreen> {
                   mapSlug: _computeMapSlug(),
                   isReadOnly: true,
                   onProvinceTapped: (province) {},
+                  onProvinceLongPressed: (code) =>
+                      _showProvinceName(context, code),
                 ),
     );
   }

@@ -335,20 +335,48 @@ class _GameScreenState extends State<GameScreen> {
     return rgb == null ? null : Color(0xFF000000 | rgb);
   }
 
-  // Builds the live order-arrow overlay from `my_orders`, mirroring
-  // `arrows_overlay.js` `renderArrowsForOrders`/`renderOrder`: resolve every
-  // province code to a point, aggregate which routes already have a move
-  // order and which fleets convoy which route, then turn each raw order into
-  // an [Order] the painter can draw without knowing anything about codes.
-  // History-mode arrows are a separate ticket (T16), so this stays empty
-  // there rather than reaching into `_historyPhase`.
+  // T19: a long-press toast with the province's translated name, mirroring
+  // `map.js`'s long-press handler. `province_names` arrives already
+  // translated server-side (`_(p.name)` in `_serialize_game_state`), so this
+  // never touches `AppLocalizations` for the name itself — only the toast's
+  // punctuation is composed client-side. Does nothing when the code has no
+  // name (an unlabelled province, or a payload that predates this field),
+  // same as the Mini App's own `if (name)` guard.
+  void _showProvinceName(BuildContext context, String code) {
+    final names = _gameState?['province_names'] as Map<String, dynamic>?;
+    final name = names?[code] as String?;
+    if (name == null) return;
+    showToast(context, '$name ($code)');
+  }
+
+  // Builds the order-arrow overlay, mirroring `arrows_overlay.js`
+  // `renderArrowsForOrders`/`renderOrder`: resolve every province code to a
+  // point, aggregate which routes already have a move order and which
+  // fleets convoy which route, then turn each raw order into an [Order] the
+  // painter can draw without knowing anything about codes.
+  //
+  // Live and history share this one builder because the row shape is close
+  // enough: both carry `order_type`/`source_code`/`target_code`/`aux_code`/
+  // `color`, and a live `my_orders` row simply has no `result` key, which
+  // reads as `null` here exactly like an unscored history row does. Where
+  // the shapes genuinely differ (history rows have no `unit_type`, and
+  // `isMyUnit` below reads `is_mine` off `_gameState`'s own live `units`,
+  // which a history unit-snapshot row never carries) this function only
+  // touches the fields both share, or gates the history-only field behind
+  // `history`.
   List<Order> _buildOrderArrows(
     BuildContext context,
     Map<String, Offset> unitPositions,
     Map<String, ProvinceData>? mapData,
   ) {
-    if (_isHistoryMode) return const [];
-    final rawOrders = _gameState?['my_orders'] as List? ?? [];
+    final history = _isHistoryMode;
+    // History: every order of the resolved phase — `_last_phase_payload`
+    // sends the whole phase, not just mine, which is exactly what lets
+    // `orphaned` below be provable for anyone's support (see its comment).
+    // Live: just mine, since a foreign player's pending orders are secret.
+    final rawOrders = history
+        ? (_historyPhase?['orders'] as List? ?? [])
+        : (_gameState?['my_orders'] as List? ?? []);
     if (rawOrders.isEmpty) return const [];
 
     final units = _gameState?['units'] as List<dynamic>? ?? [];
@@ -356,11 +384,15 @@ class _GameScreenState extends State<GameScreen> {
     final meColor = _parseHexColor(_gameState?['me']?['color'] as String?);
     final neutral = AppColors.of(context).labelTertiary;
 
-    // Same precedence as `arrows_overlay.js` `pt()`: unit centre (units move
-    // every turn, so this is the only source that can't go stale) → the
+    // Same precedence as `arrows_overlay.js` `pt()`: unit centre → the
     // admin-tunable label anchor + 16 (roughly the middle of the province,
     // for a target with no unit on it) → the province's own bounds — the
-    // last-resort fallback for a sea province with neither.
+    // last-resort fallback for a sea province with neither. `unitPositions`
+    // already resolves to the history phase's own unit snapshot first in
+    // history mode (`_computeUnitPositionsAndColors`'s `_historyPhase ??
+    // _gameState`), matching `arrows_overlay.js`'s `unitsForCenter` — a
+    // historical arrow has to point at where the unit actually was, not
+    // where it stands today.
     Offset? pt(String? code) {
       if (code == null) return null;
       final unit = unitPositions[code];
@@ -372,6 +404,10 @@ class _GameScreenState extends State<GameScreen> {
       return null;
     }
 
+    // Only meaningful live — a history unit-snapshot row carries no
+    // `is_mine` at all (`_last_phase_payload`'s `units_payload`), and the
+    // `orphaned` check below never calls this in history mode (it doesn't
+    // need to: the whole phase is already in view there).
     bool isMyUnit(String? code) {
       if (code == null) return false;
       for (final u in units) {
@@ -418,13 +454,19 @@ class _GameScreenState extends State<GameScreen> {
         if (rawType != kOrderHold &&
             rawType != kOrderMove &&
             rawType != kOrderSupport &&
-            rawType != kOrderConvoy) {
-          continue; // Retreat/build/disband arrows aren't modelled yet.
+            rawType != kOrderConvoy &&
+            rawType != kOrderRetreat) {
+          continue; // Build/disband orders have no arrow of their own.
         }
         final type = rawType!;
         final source = pt(o['source_code'] as String?);
         if (source == null) continue;
         final color = colorFor(o);
+        // Absent on every live `my_orders` row (`_serialize_game_state`
+        // never sends one) and present-but-possibly-null on a history row
+        // (`results.get(o.id)`) — both read as `null` here, which is
+        // exactly "not failed" (`OrderArrowsPainter._isFailed`).
+        final orderResult = (o['result'] as num?)?.toInt();
 
         if (type == kOrderConvoy) {
           final auxCode = o['aux_code'] as String?;
@@ -443,26 +485,34 @@ class _GameScreenState extends State<GameScreen> {
               source: source,
               target: target,
               aux: aux,
-              color: color));
+              color: color,
+              result: orderResult));
           continue;
         }
 
         if (type == kOrderHold) {
-          result.add(Order(orderType: type, source: source, color: color));
+          result.add(Order(
+              orderType: type,
+              source: source,
+              color: color,
+              result: orderResult));
           continue;
         }
 
-        if (type == kOrderMove) {
+        if (type == kOrderMove || type == kOrderRetreat) {
           final targetCode = o['target_code'] as String?;
           final target = pt(targetCode);
           if (target == null) continue;
+          // Retreat orders never carry a convoy in this codebase — `fleetsFor`
+          // simply returns nothing for one, same as a plain unconvoyed move.
           final fleets = fleetsFor(o['source_code'] as String?, targetCode);
           result.add(Order(
               orderType: type,
               source: source,
               target: target,
               convoyFleets: fleets,
-              color: color));
+              color: color,
+              result: orderResult));
           continue;
         }
 
@@ -472,18 +522,25 @@ class _GameScreenState extends State<GameScreen> {
         if (aux == null) continue;
         final targetCode = o['target_code'] as String?;
         if (targetCode == null || targetCode == auxCode) {
-          result.add(
-              Order(orderType: type, source: source, aux: aux, color: color));
+          result.add(Order(
+              orderType: type,
+              source: source,
+              aux: aux,
+              color: color,
+              result: orderResult));
           continue;
         }
         final target = pt(targetCode);
         if (target == null) continue;
         final fleets = fleetsFor(auxCode, targetCode);
-        // "The move is missing" is only provable when every order of the
-        // supported unit is visible — for a live board that's my own units
-        // only, since a foreign unit's orders are secret until resolution.
+        // "The move is missing" is provable for the whole phase in history
+        // mode (`rawOrders` is every player's orders there) and only for my
+        // own units live, since a foreign unit's pending orders are secret
+        // until resolution — arrows_overlay.js's `supportedMoveMissing`
+        // makes the same distinction with its own `if (history) return
+        // true;` short-circuit.
         final orphaned = !hasMoveFor.contains('$auxCode->$targetCode') &&
-            isMyUnit(auxCode);
+            (history || isMyUnit(auxCode));
         result.add(Order(
           orderType: type,
           source: source,
@@ -491,6 +548,7 @@ class _GameScreenState extends State<GameScreen> {
           aux: aux,
           convoyFleets: fleets,
           color: color,
+          result: orderResult,
           orphanedSupport: orphaned,
         ));
       } catch (e) {
@@ -667,10 +725,11 @@ class _GameScreenState extends State<GameScreen> {
                           _computeUnitPositionsAndColors();
                       // Order arrows are drawn from the same map-space
                       // coordinates the viewer owns — resolved here, from
-                      // `my_orders` plus whatever the viewer has already
-                      // parsed from the SVG (`bloc.mapData`), rather than in
-                      // MapViewer itself, which has no notion of a "unit
-                      // centre" or "province code" at all.
+                      // `my_orders` on the live board or the history phase's
+                      // own `orders` in history mode, plus whatever the viewer
+                      // has already parsed from the SVG (`bloc.mapData`),
+                      // rather than in MapViewer itself, which has no notion
+                      // of a "unit centre" or "province code" at all.
                       final renderedOrders = _buildOrderArrows(
                           context, unitPositions, bloc.mapData);
 
@@ -690,9 +749,12 @@ class _GameScreenState extends State<GameScreen> {
                           if (_isHistoryMode) return;
                           bloc.selectProvince(province);
                         },
+                        onProvinceLongPressed: (code) =>
+                            _showProvinceName(context, code),
                         activeOrderUnitProvince: bloc.selectedProvince,
                         validTargetProvinces: bloc.validTargetProvinces,
                         orders: renderedOrders,
+                        ordersFromHistory: _isHistoryMode,
                       );
                     },
                   ),

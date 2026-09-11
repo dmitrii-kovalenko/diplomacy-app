@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show HapticFeedback, rootBundle;
 import 'package:xml/xml.dart';
 import 'package:path_drawing/path_drawing.dart';
 import '../theme/app_theme.dart';
@@ -218,7 +219,21 @@ class MapViewer extends StatefulWidget {
   final String? mapSlug;
 
   final List<Order> orders;
+
+  /// True when [orders] came from a resolved history phase rather than the
+  /// live board — forwarded to [OrderArrowsPainter] so it knows whether
+  /// `Order.result` means anything yet (see its `history` field doc).
+  final bool ordersFromHistory;
+
   final Function(String) onProvinceTapped;
+
+  /// Fired on a long-press that lands inside a province, resolved with the
+  /// same `_paths` hit test [_handleTap] uses. Null (the default) omits the
+  /// long-press recognizer entirely rather than adding one that always
+  /// no-ops — callers with nothing to show (none today) don't pay for the
+  /// extra entry in the gesture arena.
+  final void Function(String provinceCode)? onProvinceLongPressed;
+
   final Function(Map<String, ProvinceData>)? onSvgParsed;
   final String? activeOrderUnitProvince; // If non-null, dim un-selectable provinces
   final Set<String> validTargetProvinces; // Highlight these
@@ -235,7 +250,9 @@ class MapViewer extends StatefulWidget {
     this.units = const [],
     this.mapSlug,
     this.orders = const [],
+    this.ordersFromHistory = false,
     required this.onProvinceTapped,
+    this.onProvinceLongPressed,
     this.onSvgParsed,
     this.activeOrderUnitProvince,
     this.validTargetProvinces = const {},
@@ -244,6 +261,35 @@ class MapViewer extends StatefulWidget {
 
   @override
   State<MapViewer> createState() => _MapViewerState();
+}
+
+/// A [LongPressGestureRecognizer] that rejects itself the instant a second
+/// pointer joins, instead of Flutter's default of quietly tracking only the
+/// first ("primary") pointer and ignoring the rest.
+///
+/// That default is the actual bug behind T19's defect 1: the recognizer's
+/// deadline timer is armed once, for the first pointer, and fires
+/// unconditionally 600ms later regardless of what else has touched down
+/// since. `GestureRecognizer.resolve()` settles every arena the recognizer is
+/// still a member of — both pointers' arenas once a second finger has
+/// arrived — so that unconditional `resolve(accepted)` doesn't just fire the
+/// toast, it evicts every other recognizer sharing either pointer's arena,
+/// including `InteractiveViewer`'s own pinch recognizer. A pinch that was
+/// mid-gesture is left with no recognizer to finish it, which is why a slow
+/// two-finger spread was losing its zoom entirely, not just gaining a stray
+/// toast. Rejecting outright on the second pointer, before either arena has
+/// a chance to resolve in this recognizer's favour, hands both pointers back
+/// to `InteractiveViewer` immediately — mirroring `map.js`'s `setupPanZoom`,
+/// which only arms its long-press timer while `pointers.size === 1`.
+class _SinglePointerLongPressRecognizer extends LongPressGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    final isFirstPointer = state == GestureRecognizerState.ready;
+    super.addAllowedPointer(event);
+    if (!isFirstPointer) {
+      resolve(GestureDisposition.rejected);
+    }
+  }
 }
 
 class _MapViewerState extends State<MapViewer> {
@@ -575,6 +621,31 @@ class _MapViewerState extends State<MapViewer> {
     }
   }
 
+  // Deliberately not gated on `widget.isReadOnly` — that flag only guards
+  // giving orders, and reading a province's name is exactly as safe on the
+  // read-only lobby preview as on a live board (arguably more useful there:
+  // T19's whole premise is a new player learning an unfamiliar map before
+  // they've joined). `details.localPosition` is already in map space here,
+  // the same as `_handleTap`'s: this recognizer sits inside
+  // `InteractiveViewer` as a sibling of the `SizedBox` the paths are
+  // defined against, so Flutter's hit-testing has already undone the pan/
+  // zoom transform by the time this callback runs.
+  //
+  // No pointer-count check here: by the time `onLongPressStart` ever fires,
+  // `_SinglePointerLongPressRecognizer` has already guaranteed a second
+  // pointer never let it win the arena, so there is nothing left to check.
+  void _handleLongPress(LongPressStartDetails details) {
+    final callback = widget.onProvinceLongPressed;
+    if (callback == null) return;
+    for (final entry in _paths.entries) {
+      if (entry.value.contains(details.localPosition)) {
+        HapticFeedback.mediumImpact();
+        callback(entry.key);
+        break;
+      }
+    }
+  }
+
   /// Fits `_mapSize` inside `viewportSize` ("contain": the whole board is
   /// always visible, letterboxed on whichever axis has slack) and centres
   /// it — but only actually writes `_transformController.value` (re-homing,
@@ -638,8 +709,27 @@ class _MapViewerState extends State<MapViewer> {
           maxScale: _homeScale * 6.7, // matches the Mini App's zoom range
           constrained: false,
           boundaryMargin: _boundaryMargin,
-          child: GestureDetector(
-            onTapUp: _handleTap,
+          child: RawGestureDetector(
+            // A plain `GestureDetector` can only ever hand out its own stock
+            // `LongPressGestureRecognizer`, which is exactly the one with
+            // the two-pointer bug `_SinglePointerLongPressRecognizer` exists
+            // to fix — so tap and long-press are wired up here by hand
+            // instead, one recognizer factory each, rather than through
+            // `GestureDetector`'s `onTapUp`/`onLongPressStart` shorthand.
+            gestures: {
+              TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                () => TapGestureRecognizer(),
+                (recognizer) => recognizer.onTapUp = _handleTap,
+              ),
+              // Only registered when there is a callback to fire — see
+              // [MapViewer.onProvinceLongPressed]'s doc for why a caller
+              // with nothing to show doesn't pay for the extra arena entry.
+              if (widget.onProvinceLongPressed != null)
+                _SinglePointerLongPressRecognizer: GestureRecognizerFactoryWithHandlers<_SinglePointerLongPressRecognizer>(
+                  () => _SinglePointerLongPressRecognizer(),
+                  (recognizer) => recognizer.onLongPressStart = _handleLongPress,
+                ),
+            },
             child: SizedBox(
               width: _mapSize.width,
               height: _mapSize.height,
@@ -684,7 +774,8 @@ class _MapViewerState extends State<MapViewer> {
                   // group is appended after `drawUnits()`/`drawSupplyCenters()`
                   // in the Mini App, putting arrows last in paint order there
                   // too.
-                  foregroundPainter: OrderArrowsPainter(widget.orders),
+                  foregroundPainter: OrderArrowsPainter(widget.orders,
+                      history: widget.ordersFromHistory),
                 ),
               ),
             ),
